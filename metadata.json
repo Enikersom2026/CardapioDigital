@@ -1,0 +1,6 @@
+{
+  "name": "Gerador de Cardápio com IA",
+  "description": "Crie descrições gourmet irresistíveis, harmonize pratos e monte cardápios profissionais para restaurantes e hamburguerias com IA do Google Gemini.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
