@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Printer, Copy, Check, QrCode, Share2, MessageCircle, FileText, Receipt, Sliders } from 'lucide-react';
+import { Printer, Copy, Check, QrCode, Share2, MessageCircle, FileText, Receipt, Sliders, Cpu } from 'lucide-react';
 import { MenuItem, RestaurantConfig } from '../types';
+import { testarImpressoraTermica } from '../utils/thermalPrinter';
 
 interface PrintAndExportProps {
   restaurant: RestaurantConfig;
@@ -13,6 +14,21 @@ export const PrintAndExport: React.FC<PrintAndExportProps> = ({
 }) => {
   const [copiedMenu, setCopiedMenu] = useState(false);
   const [formatoImpressao, setFormatoImpressao] = useState<'58mm' | 'a4'>('58mm');
+  const [statusTesteTermico, setStatusTesteTermico] = useState<string | null>(null);
+  const [testandoSerial, setTestandoSerial] = useState(false);
+
+  const handleTestarHardwareTermico = async () => {
+    setTestandoSerial(true);
+    setStatusTesteTermico(null);
+    try {
+      const res = await testarImpressoraTermica();
+      setStatusTesteTermico(res.mensagem);
+    } catch (err: any) {
+      setStatusTesteTermico(err?.message || 'Falha na conexão com a impressora.');
+    } finally {
+      setTestandoSerial(false);
+    }
+  };
 
   const handlePrint = (formato?: '58mm' | 'a4') => {
     const chosenFormat = formato || formatoImpressao;
@@ -100,8 +116,34 @@ export const PrintAndExport: React.FC<PrintAndExportProps> = ({
                 : 'Imprimir Folha A4'}
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={handleTestarHardwareTermico}
+            disabled={testandoSerial}
+            className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-[0_0_15px_rgba(234,88,12,0.4)] transition-all cursor-pointer disabled:opacity-50"
+            title="Enviar comando direto ESC/POS para a impressora USB/Serial 58mm/80mm"
+          >
+            <Cpu className="w-4 h-4" />
+            <span>{testandoSerial ? 'Conectando...' : 'Testar Térmica USB'}</span>
+          </button>
         </div>
       </div>
+
+      {statusTesteTermico && (
+        <div className="no-print mb-6 p-3 rounded-xl bg-orange-950/70 border border-orange-500/50 text-orange-200 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Printer className="w-4 h-4 text-orange-400" />
+            <span>{statusTesteTermico}</span>
+          </div>
+          <button
+            onClick={() => setStatusTesteTermico(null)}
+            className="text-orange-400 hover:text-white font-bold ml-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Seletor de Formato de Impressora (58mm vs A4) */}
       <div className="no-print bg-zinc-950 p-4 rounded-2xl border border-cyan-500/35 shadow-[0_0_20px_rgba(6,182,212,0.15)] mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

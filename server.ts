@@ -15,8 +15,6 @@ app.use(express.json());
 // Redirecionamentos de rotas legadas .html diretamente para o aplicativo SPA unificado
 app.get([
   '/painel.html',
-  '/dashboard.html',
-  '/admin_dashboard.html',
   '/admin_painel_vendas.html',
   '/admin_painel_financeiro.html',
 ], (_req: Request, res: Response) => res.redirect('/?tab=painel'));
@@ -24,11 +22,33 @@ app.get([
 app.get([
   '/logistica.html',
   '/delivery.html',
-  '/admin_painel_logistica.html',
 ], (_req: Request, res: Response) => res.redirect('/?tab=logistica'));
 
+app.get('/admin_painel_logistica.html', (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'admin_painel_logistica.html'));
+});
+
+app.get('/admin_painel_mesas.html', (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'admin_painel_mesas.html'));
+});
+
+app.get(['/admin_dashboard.html', '/admin_dashboard', '/dashboard.html', '/dashboard'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'admin_dashboard.html'));
+});
+
+app.get(['/admin_painel_estoque.html', '/estoque.html'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'admin_painel_estoque.html'));
+});
+
+app.get(['/cardapio.html', '/cardapio'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'cardapio.html'));
+});
+
+app.get(['/carrinho.html', '/carrinho'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'carrinho.html'));
+});
+
 app.get('/entregador.html', (_req: Request, res: Response) => res.redirect('/?tab=entregador'));
-app.get('/admin_painel_mesas.html', (_req: Request, res: Response) => res.redirect('/?tab=mesas'));
 app.get(['/admin.html', '/admin_cadastro.html'], (_req: Request, res: Response) => res.redirect('/?tab=admin'));
 app.get('/acompanhar.html', (_req: Request, res: Response) => res.redirect('/?tab=preview'));
 app.get('/auth.html', (_req: Request, res: Response) => res.redirect('/?screen=auth'));

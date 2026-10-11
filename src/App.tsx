@@ -29,11 +29,15 @@ export default function App() {
   });
   const [userRole, setUserRole] = useState<'admin' | 'customer' | 'entregador'>('admin');
   const [userIdentifier, setUserIdentifier] = useState('studio4zero5hamburgueria@gmail.com');
-  const [painelSubTab, setPainelSubTab] = useState<'dashboard' | 'vendas' | 'financeiro'>('dashboard');
+  const [painelSubTab, setPainelSubTab] = useState<'dashboard' | 'vendas' | 'financeiro' | 'estoque'>('dashboard');
 
   const [activeTab, setActiveTab] = useState<AppTab>(() => {
     try {
       const searchParams = new URLSearchParams(window.location.search);
+      // Se escaneou QR Code de mesa (ex: ?mesa=5), abre direto no Cardápio da Mesa
+      if (searchParams.get('mesa')) {
+        return 'preview';
+      }
       const tabParam = searchParams.get('tab') as AppTab | null;
       if (tabParam && ['painel', 'atendimento', 'logistica', 'entregador', 'mesas', 'admin', 'preview', 'delivery', 'ideas', 'export'].includes(tabParam)) {
         return tabParam;

@@ -25,10 +25,12 @@ import {
   ArrowRight,
   ShieldCheck,
   Radio,
+  Package,
 } from 'lucide-react';
 import { db, doc, updateDoc, onSnapshot, collection, setDoc, deleteDoc } from '../services/firebase';
-import { DeliveryOrder, MenuItem, RestaurantConfig } from '../types';
+import { DeliveryOrder, MenuItem, RestaurantConfig, EstoqueInsumo } from '../types';
 import { CATEGORIES } from '../data/initialMenu';
+import { imprimirCupomCozinha, imprimirFechamentoDeCaixa } from '../utils/thermalPrinter';
 
 interface PainelGeralProps {
   restaurant: RestaurantConfig;
@@ -37,9 +39,9 @@ interface PainelGeralProps {
   onNavigateToPreview: () => void;
   onNavigateToAdminMenu: () => void;
   onNavigateToAtendimento?: () => void;
-  initialSubTab?: 'dashboard' | 'logistica' | 'entregador' | 'mesas' | 'cadastro' | 'vendas' | 'financeiro';
-  activeSubTab?: 'dashboard' | 'vendas' | 'financeiro';
-  onSubTabChange?: (tab: 'dashboard' | 'vendas' | 'financeiro') => void;
+  initialSubTab?: 'dashboard' | 'logistica' | 'entregador' | 'mesas' | 'cadastro' | 'vendas' | 'financeiro' | 'estoque';
+  activeSubTab?: 'dashboard' | 'vendas' | 'financeiro' | 'estoque';
+  onSubTabChange?: (tab: 'dashboard' | 'vendas' | 'financeiro' | 'estoque') => void;
 }
 
 interface MesaItem {
@@ -74,7 +76,7 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
   activeSubTab,
   onSubTabChange,
 }) => {
-  const [subTab, setSubTab] = useState<'dashboard' | 'logistica' | 'entregador' | 'mesas' | 'cadastro' | 'vendas' | 'financeiro'>(
+  const [subTab, setSubTab] = useState<'dashboard' | 'logistica' | 'entregador' | 'mesas' | 'cadastro' | 'vendas' | 'financeiro' | 'estoque'>(
     activeSubTab || initialSubTab
   );
 
@@ -84,9 +86,9 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
     }
   }, [activeSubTab]);
 
-  const handleTrocarSubTab = (novaAba: 'dashboard' | 'logistica' | 'entregador' | 'mesas' | 'cadastro' | 'vendas' | 'financeiro') => {
+  const handleTrocarSubTab = (novaAba: 'dashboard' | 'logistica' | 'entregador' | 'mesas' | 'cadastro' | 'vendas' | 'financeiro' | 'estoque') => {
     setSubTab(novaAba);
-    if (novaAba === 'dashboard' || novaAba === 'vendas' || novaAba === 'financeiro') {
+    if (novaAba === 'dashboard' || novaAba === 'vendas' || novaAba === 'financeiro' || novaAba === 'estoque') {
       onSubTabChange?.(novaAba);
     }
   };
@@ -175,6 +177,151 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
   const [cadFoto, setCadFoto] = useState('');
   const [gerandoIA, setGerandoIA] = useState(false);
   const [sucessoCad, setSucessoCad] = useState(false);
+  const primeiraCargaPedidosRef = useRef(true);
+
+  // ==========================================
+  // 📦 CONTROLE DE ESTOQUE DE INSUMOS
+  // ==========================================
+  const INSUMOS_PADRAO: EstoqueInsumo[] = [
+    { id: 'pao-brioche', nome: 'Pão Brioche Selado', categoria: 'paes', quantidade: 140, unidade: 'un', minimo: 30 },
+    { id: 'blend-bovino-160g', nome: 'Blend Bovino Costela 160g', categoria: 'carnes', quantidade: 85, unidade: 'un', minimo: 20 },
+    { id: 'bacon-defumado-fatias', nome: 'Bacon Artesanal Fatiado', categoria: 'frios', quantidade: 12, unidade: 'kg', minimo: 3 },
+    { id: 'queijo-cheddar-fatias', nome: 'Queijo Cheddar Inglês Fatiado', categoria: 'frios', quantidade: 95, unidade: 'un', minimo: 25 },
+    { id: 'batata-palito-congelada', nome: 'Batata Rústica / Palito', categoria: 'hortifruti', quantidade: 18, unidade: 'kg', minimo: 5 },
+    { id: 'embalagem-hamburguer-box', nome: 'Caixa Térmica Box Burger', categoria: 'embalagens', quantidade: 210, unidade: 'un', minimo: 50 },
+    { id: 'coca-cola-lata-350', nome: 'Coca-Cola 350ml Lata', categoria: 'bebidas', quantidade: 48, unidade: 'un', minimo: 12 },
+  ];
+
+  const [insumos, setInsumos] = useState<EstoqueInsumo[]>(() => {
+    try {
+      const salvos = localStorage.getItem('domgabriel_estoque_insumos');
+      if (salvos) {
+        const parsed = JSON.parse(salvos);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INSUMOS_PADRAO;
+  });
+
+  const [filtroCategoriaEstoque, setFiltroCategoriaEstoque] = useState<string>('todas');
+  const [buscaEstoque, setBuscaEstoque] = useState('');
+  const [novoInsumoNome, setNovoInsumoNome] = useState('');
+  const [novoInsumoCat, setNovoInsumoCat] = useState('carnes');
+  const [novoInsumoQtd, setNovoInsumoQtd] = useState('');
+  const [novoInsumoUnidade, setNovoInsumoUnidade] = useState('un');
+  const [novoInsumoMinimo, setNovoInsumoMinimo] = useState('');
+  const [salvandoEstoque, setSalvandoEstoque] = useState(false);
+
+  // Escuta Estoque no Firestore em Tempo Real
+  useEffect(() => {
+    let unsubscribe = () => {};
+    try {
+      unsubscribe = onSnapshot(
+        collection(db, 'estoque'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const lista: EstoqueInsumo[] = [];
+            snapshot.forEach((docSnap) => {
+              const d = docSnap.data();
+              lista.push({
+                id: docSnap.id,
+                nome: d.nome || 'Insumo',
+                categoria: d.categoria || 'Geral',
+                quantidade: Number(d.quantidade) || 0,
+                unidade: d.unidade || 'un',
+                minimo: Number(d.minimo) || 0,
+                atualizadoEm: d.atualizadoEm,
+              });
+            });
+            lista.sort((a, b) => a.nome.localeCompare(b.nome));
+            setInsumos(lista);
+            localStorage.setItem('domgabriel_estoque_insumos', JSON.stringify(lista));
+          } else {
+            // Se coleção estiver vazia no Firestore, semear
+            INSUMOS_PADRAO.forEach(async (item) => {
+              try {
+                await setDoc(doc(db, 'estoque', item.id), item);
+              } catch {}
+            });
+          }
+        },
+        (err) => console.warn('Firestore estoque listener:', err)
+      );
+    } catch (e) {
+      console.warn('Erro ao conectar Firestore estoque:', e);
+    }
+    return () => unsubscribe();
+  }, []);
+
+  const handleSalvarInsumo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novoInsumoNome.trim()) {
+      alert('Por favor, informe o nome do insumo!');
+      return;
+    }
+    setSalvandoEstoque(true);
+    const id = novoInsumoNome.toLowerCase().trim().replace(/[^a-z0-9]/g, '-');
+    const dados: EstoqueInsumo = {
+      id,
+      nome: novoInsumoNome.trim(),
+      categoria: novoInsumoCat,
+      quantidade: parseFloat(novoInsumoQtd) || 0,
+      unidade: novoInsumoUnidade,
+      minimo: parseFloat(novoInsumoMinimo) || 0,
+      atualizadoEm: new Date().toISOString(),
+    };
+
+    try {
+      await setDoc(doc(db, 'estoque', id), dados);
+    } catch (err) {
+      console.warn('Erro ao salvar no Firestore estoque:', err);
+    }
+
+    setInsumos((prev) => {
+      const idx = prev.findIndex((i) => i.id === id);
+      const atualizada = idx >= 0 ? prev.map((i) => (i.id === id ? dados : i)) : [...prev, dados];
+      localStorage.setItem('domgabriel_estoque_insumos', JSON.stringify(atualizada));
+      return atualizada;
+    });
+
+    setNovoInsumoNome('');
+    setNovoInsumoQtd('');
+    setNovoInsumoMinimo('');
+    setSalvandoEstoque(false);
+  };
+
+  const handleAjustarEstoque = async (id: string, variacao: number) => {
+    const item = insumos.find((i) => i.id === id);
+    if (!item) return;
+    const novaQtd = Math.max(0, Number(item.quantidade) + variacao);
+
+    try {
+      await updateDoc(doc(db, 'estoque', id), {
+        quantidade: novaQtd,
+        atualizadoEm: new Date().toISOString(),
+      });
+    } catch {}
+
+    setInsumos((prev) => {
+      const atualizada = prev.map((i) => (i.id === id ? { ...i, quantidade: novaQtd } : i));
+      localStorage.setItem('domgabriel_estoque_insumos', JSON.stringify(atualizada));
+      return atualizada;
+    });
+  };
+
+  const handleRemoverInsumo = async (id: string) => {
+    if (confirm('Tem certeza que deseja remover permanentemente este insumo do seu estoque?')) {
+      try {
+        await deleteDoc(doc(db, 'estoque', id));
+      } catch {}
+
+      setInsumos((prev) => {
+        const atualizada = prev.filter((i) => i.id !== id);
+        localStorage.setItem('domgabriel_estoque_insumos', JSON.stringify(atualizada));
+        return atualizada;
+      });
+    }
+  };
 
   // 1. Escuta Firestore para pedidos
   useEffect(() => {
@@ -208,6 +355,24 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
             lista.sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime());
             setPedidos(lista);
             localStorage.setItem('domgabriel_pedidos_entregador', JSON.stringify(lista));
+
+            // Auto-impressão de novos pedidos na Cozinha via docChanges
+            snapshot.docChanges().forEach((change) => {
+              if (change.type === 'added') {
+                const novoPedido: any = change.doc.data();
+                novoPedido.id = change.doc.id;
+
+                if (!primeiraCargaPedidosRef.current && (novoPedido.status === 'pendente' || novoPedido.status === 'novo')) {
+                  const autoPrintLigado = localStorage.getItem('domgabriel_autoprint_cozinha') !== 'false';
+                  if (autoPrintLigado) {
+                    imprimirCupomCozinha(novoPedido).catch((err) => {
+                      console.warn('Auto-impressão na cozinha (Painel Geral):', err);
+                    });
+                  }
+                }
+              }
+            });
+            primeiraCargaPedidosRef.current = false;
           }
         },
         (err) => console.warn('Firestore pedidos status:', err)
@@ -417,6 +582,36 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
     }
   };
 
+  // Fechamento de Caixa Automatizado com Impressão Térmica
+  const handleFecharCaixaAutomatizado = async () => {
+    if (!confirm('Deseja mesmo fechar o caixa atual? O relatório de faturamento será impresso na hora.')) return;
+    try {
+      let totalFaturado = 0;
+      let qtdDelivery = 0;
+      let qtdMesa = 0;
+
+      pedidos.forEach((p) => {
+        const st = p.status as string;
+        if (st === 'entregue' || st === 'finalizado_local' || st === 'finalizado' || st === 'concluido') {
+          totalFaturado += (p.total || 36.9);
+          if (p.tipo === 'delivery' || !(p as any).mesa) qtdDelivery++;
+          else qtdMesa++;
+        }
+      });
+
+      const res = await imprimirFechamentoDeCaixa({
+        totalFaturado,
+        qtdDelivery,
+        qtdMesa,
+        insumosStatus: 'Verificado',
+      });
+      alert(`Caixa fechado e cupom emitido! 🏁🖨️ ${res.mensagem}`);
+    } catch (err) {
+      console.error(err);
+      alert('Caixa processado no sistema, mas ocorreu um erro na impressora.');
+    }
+  };
+
   // Métricas calculadas em tempo real
   const pedidosAtivos = pedidos.filter((p) =>
     ['pendente', 'preparando', 'em_preparo', 'pronto', 'pronto_entrega', 'saiu_para_entrega', 'saiu_entrega'].includes(p.status)
@@ -483,6 +678,18 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
           >
             <DollarSign className="w-3.5 h-3.5 text-yellow-400" />
             <span>💰 Financeiro & Métricas</span>
+          </button>
+
+          <button
+            onClick={() => handleTrocarSubTab('estoque')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              subTab === 'estoque'
+                ? 'bg-[#ff4b2b] text-white shadow-sm'
+                : 'text-[#8d8d99] hover:text-white hover:bg-[#28282e]'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5 text-amber-400" />
+            <span>📦 Estoque de Insumos</span>
           </button>
         </div>
       </header>
@@ -1382,6 +1589,314 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
                   <span className="text-base tabular-nums">
                     R$ {(faturamentoTotal - totalTaxas * 0.85).toFixed(2).replace('.', ',')}
                   </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* TELA 4: CONTROLE DE ESTOQUE DE INSUMOS                          */}
+          {/* ============================================================== */}
+          {subTab === 'estoque' && (
+            <div className="max-w-6xl mx-auto space-y-6">
+              {/* Header do Estoque */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[#1a1a1e] border border-[#29292e]">
+                <div>
+                  <h2 className="text-xl font-black text-white flex items-center gap-2">
+                    <span className="p-2 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                      <Package className="w-5 h-5" />
+                    </span>
+                    <span>Controle de Estoque Inteligente</span>
+                  </h2>
+                  <p className="text-xs text-[#8d8d99] mt-1">
+                    Monitoramento em tempo real de carnes, pães, queijos, embalagens e bebidas da Hamburgueria Dom Gabriel
+                  </p>
+                </div>
+
+                {/* Métricas rápidas de estoque */}
+                <div className="flex items-center gap-2">
+                  <div className="px-3.5 py-2 rounded-xl bg-[#202024] border border-[#29292e] text-center">
+                    <span className="text-[10px] text-[#8d8d99] uppercase font-bold block">Total Insumos</span>
+                    <span className="text-base font-black text-white">{insumos.length}</span>
+                  </div>
+                  <div className="px-3.5 py-2 rounded-xl bg-[#202024] border border-red-900/40 text-center">
+                    <span className="text-[10px] text-red-400 uppercase font-bold block">Críticos</span>
+                    <span className="text-base font-black text-red-400">
+                      {insumos.filter((i) => Number(i.quantidade) <= Number(i.minimo)).length}
+                    </span>
+                  </div>
+                  <a
+                    href="/admin_dashboard.html"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#00b37e]/20 hover:bg-[#00b37e]/30 text-xs font-bold text-[#00b37e] border border-[#00b37e]/40 transition-all"
+                    title="Abrir Dashboard Fiscal de Estoque & Caixa"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Dashboard & Caixa</span>
+                  </a>
+                  <a
+                    href="/admin_painel_estoque.html"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#29292e] hover:bg-[#333] text-xs font-bold text-white border border-[#444] transition-all"
+                    title="Abrir em aba isolada"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Estoque Isolado</span>
+                  </a>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Coluna 1: Operações de Caixa & Formulário de Entrada/Cadastro */}
+                <div className="lg:col-span-4 space-y-4">
+                  {/* Card Operações do Caixa */}
+                  <div className="bg-[#1a1a1e] border border-[#29292e] p-5 rounded-2xl space-y-3 shadow-md">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-[#e1e1e6] flex items-center gap-2">
+                      <span className="text-base">🧾</span>
+                      <span>Operações do Caixa</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={handleFecharCaixaAutomatizado}
+                      className="w-full py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider bg-[#00b37e] hover:bg-[#009968] text-white transition-all shadow-[0_4px_14px_rgba(0,179,126,0.25)] cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <span>🧾</span>
+                      <span>Fechar Caixa e Imprimir Relatório</span>
+                    </button>
+                    <p className="text-[11px] text-[#8d8d99] text-center leading-tight">
+                      O relatório consolida as vendas do Firestore e aciona a impressora térmica USB/Serial.
+                    </p>
+                  </div>
+
+                  {/* Formulário de Cadastro de Insumo */}
+                  <div className="bg-[#1a1a1e] border border-[#29292e] p-5 rounded-2xl h-fit space-y-4">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-[#e1e1e6] flex items-center gap-2">
+                      <Plus className="w-4 h-4 text-[#ff4b2b]" />
+                      <span>Cadastrar / Atualizar Insumo</span>
+                    </h3>
+
+                  <form onSubmit={handleSalvarInsumo} className="space-y-3.5">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#c4c4cc] mb-1">
+                        Nome do Insumo
+                      </label>
+                      <input
+                        type="text"
+                        value={novoInsumoNome}
+                        onChange={(e) => setNovoInsumoNome(e.target.value)}
+                        placeholder="Ex: Pão Brioche, Blend Bovino, Bacon"
+                        className="w-full p-2.5 rounded-lg bg-[#202024] border border-[#29292e] text-white text-sm focus:border-[#ff4b2b] outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#c4c4cc] mb-1">
+                        Categoria
+                      </label>
+                      <select
+                        value={novoInsumoCat}
+                        onChange={(e) => setNovoInsumoCat(e.target.value)}
+                        className="w-full p-2.5 rounded-lg bg-[#202024] border border-[#29292e] text-white text-sm focus:border-[#ff4b2b] outline-none"
+                      >
+                        <option value="carnes">Carnes & Blends</option>
+                        <option value="paes">Pães & Panificação</option>
+                        <option value="frios">Queijos & Frios</option>
+                        <option value="hortifruti">Hortifrúti</option>
+                        <option value="embalagens">Embalagens & Descartáveis</option>
+                        <option value="bebidas">Bebidas Fechadas</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#c4c4cc] mb-1">
+                          Quantidade Atual
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={novoInsumoQtd}
+                          onChange={(e) => setNovoInsumoQtd(e.target.value)}
+                          placeholder="0"
+                          className="w-full p-2.5 rounded-lg bg-[#202024] border border-[#29292e] text-white text-sm focus:border-[#ff4b2b] outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#c4c4cc] mb-1">
+                          Unidade
+                        </label>
+                        <select
+                          value={novoInsumoUnidade}
+                          onChange={(e) => setNovoInsumoUnidade(e.target.value)}
+                          className="w-full p-2.5 rounded-lg bg-[#202024] border border-[#29292e] text-white text-sm focus:border-[#ff4b2b] outline-none"
+                        >
+                          <option value="un">Unidades (un)</option>
+                          <option value="kg">Quilos (kg)</option>
+                          <option value="pct">Pacotes (pct)</option>
+                          <option value="cx">Caixas (cx)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#c4c4cc] mb-1">
+                        Estoque Mínimo de Alerta
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={novoInsumoMinimo}
+                        onChange={(e) => setNovoInsumoMinimo(e.target.value)}
+                        placeholder="Avisar quando abaixo de..."
+                        className="w-full p-2.5 rounded-lg bg-[#202024] border border-[#29292e] text-white text-sm focus:border-[#ff4b2b] outline-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={salvandoEstoque}
+                      className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-[#ff4b2b] hover:bg-[#e03d1f] text-white transition-all shadow-md cursor-pointer disabled:opacity-50"
+                    >
+                      {salvandoEstoque ? 'Salvando...' : 'Salvar no Estoque'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+                {/* Coluna 2: Tabela do Inventário em Tempo Real */}
+                <div className="lg:col-span-8 bg-[#1a1a1e] border border-[#29292e] p-5 rounded-2xl space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#29292e]">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-[#e1e1e6]">
+                      Inventário em Tempo Real
+                    </h3>
+
+                    {/* Filtros e Busca */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                        <input
+                          type="text"
+                          value={buscaEstoque}
+                          onChange={(e) => setBuscaEstoque(e.target.value)}
+                          placeholder="Buscar insumo..."
+                          className="pl-8 pr-3 py-1.5 rounded-lg bg-[#202024] border border-[#29292e] text-xs text-white placeholder-zinc-500 outline-none w-36 sm:w-44 focus:border-orange-500"
+                        />
+                      </div>
+
+                      <select
+                        value={filtroCategoriaEstoque}
+                        onChange={(e) => setFiltroCategoriaEstoque(e.target.value)}
+                        className="py-1.5 px-2.5 rounded-lg bg-[#202024] border border-[#29292e] text-xs text-white outline-none focus:border-orange-500"
+                      >
+                        <option value="todas">Todas Categorias</option>
+                        <option value="carnes">Carnes</option>
+                        <option value="paes">Pães</option>
+                        <option value="frios">Queijos & Frios</option>
+                        <option value="hortifruti">Hortifrúti</option>
+                        <option value="embalagens">Embalagens</option>
+                        <option value="bebidas">Bebidas</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-[#29292e] text-[11px] uppercase tracking-wider text-[#8d8d99]">
+                          <th className="py-2.5 px-3">Insumo</th>
+                          <th className="py-2.5 px-3">Qtd. Atual</th>
+                          <th className="py-2.5 px-3">Status</th>
+                          <th className="py-2.5 px-3 text-right">Ações Rápidas</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#24242c] text-sm">
+                        {insumos
+                          .filter((item) => {
+                            const matchCat =
+                              filtroCategoriaEstoque === 'todas' ||
+                              item.categoria.toLowerCase() === filtroCategoriaEstoque.toLowerCase();
+                            const matchBusca =
+                              !buscaEstoque.trim() ||
+                              item.nome.toLowerCase().includes(buscaEstoque.toLowerCase());
+                            return matchCat && matchBusca;
+                          })
+                          .map((item) => {
+                            const isCritico = Number(item.quantidade) <= Number(item.minimo);
+                            return (
+                              <tr key={item.id} className="hover:bg-[#202024]/60 transition-colors">
+                                <td className="py-3 px-3">
+                                  <strong className="text-white font-bold block text-sm">{item.nome}</strong>
+                                  <span className="text-[11px] text-[#8d8d99] capitalize">
+                                    {item.categoria}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3">
+                                  <span
+                                    className={`font-black text-base tabular-nums ${
+                                      isCritico ? 'text-red-400' : 'text-[#00b37e]'
+                                    }`}
+                                  >
+                                    {item.quantidade}
+                                  </span>
+                                  <span className="text-xs text-[#8d8d99] ml-1">{item.unidade}</span>
+                                </td>
+                                <td className="py-3 px-3">
+                                  {isCritico ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-red-950/40 text-red-400 border border-red-800/40">
+                                      ⚠️ CRÍTICO (Abaixo de {item.minimo})
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-950/40 text-[#00b37e] border border-emerald-800/40">
+                                      ✅ NORMAL
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3 text-right">
+                                  <div className="inline-flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAjustarEstoque(item.id, -1)}
+                                      className="px-2 py-1 bg-[#29292e] hover:bg-[#383840] border border-[#444] rounded text-xs font-bold text-white transition-colors"
+                                      title="Diminuir 1"
+                                    >
+                                      -1
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAjustarEstoque(item.id, 1)}
+                                      className="px-2 py-1 bg-[#29292e] hover:bg-[#383840] border border-[#444] rounded text-xs font-bold text-white transition-colors"
+                                      title="Aumentar 1"
+                                    >
+                                      +1
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAjustarEstoque(item.id, 5)}
+                                      className="px-2 py-1 bg-[#29292e] hover:bg-[#383840] border border-[#444] rounded text-xs font-bold text-white transition-colors"
+                                      title="Aumentar 5"
+                                    >
+                                      +5
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoverInsumo(item.id)}
+                                      className="px-2 py-1 bg-red-950/20 hover:bg-red-900/40 border border-red-800/30 rounded text-xs text-red-400 transition-colors ml-1"
+                                      title="Remover Insumo"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>

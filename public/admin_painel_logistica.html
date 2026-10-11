@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Logística & Cozinha - Dom Gabriel Hamburgueria</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes pulse-fast {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.02); }
+    }
+    .pulse-glow {
+      box-shadow: 0 0 25px rgba(255, 75, 43, 0.4);
+    }
+  </style>
+</head>
+<body class="bg-[#0f1016] text-white min-h-screen font-sans selection:bg-[#ff4b2b] selection:text-white">
+  <div class="max-w-6xl mx-auto p-4 sm:p-6">
+    <!-- Top Header -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 mb-6 border-b border-[#282a36]">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">🍔</span>
+          <div>
+            <h1 class="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#ff4b2b] to-amber-400">
+              DOM GABRIEL HAMBURGUERIA
+            </h1>
+            <p class="text-xs text-zinc-400">Painel de Logística, Despacho e Impressão Térmica em Tempo Real</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons Hardware -->
+      <div class="flex flex-wrap items-center gap-2">
+        <a href="/" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold rounded-xl border border-zinc-700 flex items-center gap-1.5 transition-all text-zinc-300">
+          ⬅ Ir para o App Principal
+        </a>
+
+        <!-- Botão Conectar USB -->
+        <button id="btnConectarUSB" type="button" class="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/60 text-amber-300 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-[0_0_12px_rgba(245,158,11,0.2)] cursor-pointer">
+          <span>🔌 Conectar USB</span>
+        </button>
+
+        <!-- Botão Conectar Bluetooth -->
+        <button id="btnConectarBluetooth" type="button" class="px-3.5 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/60 text-cyan-300 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-[0_0_12px_rgba(6,182,212,0.2)] cursor-pointer">
+          <span>📱 Conectar Bluetooth</span>
+        </button>
+
+        <!-- Botão Testar Impressão na Chapa -->
+        <button id="btnTestarImpressao" type="button" class="px-3.5 py-2 bg-[#ff4b2b]/20 hover:bg-[#ff4b2b]/30 border border-[#ff4b2b]/60 text-[#ff7259] text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer">
+          <span>🖨️ Testar Cupom Chapa</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Status Bar Hardware -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+      <div id="statusUsbCard" class="bg-[#181922] border border-[#282a36] rounded-xl p-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span class="text-lg">🔌</span>
+          <div>
+            <div class="text-[11px] text-zinc-400 font-bold uppercase">Porta USB (Serial)</div>
+            <div id="statusUsbTexto" class="text-xs font-black text-zinc-300">Desconectada</div>
+          </div>
+        </div>
+        <span id="statusUsbBadge" class="w-2.5 h-2.5 rounded-full bg-zinc-600"></span>
+      </div>
+
+      <div id="statusBtCard" class="bg-[#181922] border border-[#282a36] rounded-xl p-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span class="text-lg">📱</span>
+          <div>
+            <div class="text-[11px] text-zinc-400 font-bold uppercase">Bluetooth Sem Fio</div>
+            <div id="statusBtTexto" class="text-xs font-black text-zinc-300">Desconectada</div>
+          </div>
+        </div>
+        <span id="statusBtBadge" class="w-2.5 h-2.5 rounded-full bg-zinc-600"></span>
+      </div>
+
+      <div class="bg-[#181922] border border-emerald-500/40 rounded-xl p-3.5 flex items-center justify-between shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+        <div class="flex items-center gap-2.5">
+          <span class="text-lg animate-pulse">📡</span>
+          <div>
+            <div class="text-[11px] text-zinc-400 font-bold uppercase">Gatilho em Tempo Real</div>
+            <div class="text-xs font-black text-emerald-400">Firebase Firestore Ativo</div>
+          </div>
+        </div>
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+      </div>
+    </div>
+
+    <!-- Feed de Pedidos em Tempo Real -->
+    <div class="bg-[#181922] border border-[#282a36] rounded-2xl p-4 sm:p-5">
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-[#282a36]">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">📋</span>
+          <h2 class="text-sm sm:text-base font-black text-white">Pedidos Recebidos em Tempo Real (Fila de Chapa & Despacho)</h2>
+        </div>
+        <span id="contadorPedidos" class="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-300">0 pedidos</span>
+      </div>
+
+      <div id="listaPedidos" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <div class="col-span-full py-12 text-center text-zinc-500 text-xs">
+          Conectando ao Firebase Firestore e escutando pedidos pendentes...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD5kk3WUqqF7U6Qg3UtRdqGjKN6Bd_1Zsk",
+      authDomain: "cardapiodigital-b8551.firebaseapp.com",
+      projectId: "cardapiodigital-b8551",
+      storageBucket: "cardapiodigital-b8551.firebasestorage.app",
+      messagingSenderId: "560080093081",
+      appId: "1:560080093081:web:fac59c4fa4b392657c1d08"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Variáveis para guardar a conexão ativa com a impressora
+    let portaUsbAtiva = null;
+    let dispositivoBluetoothAtivo = null;
+    let caracteristicaGattBluetooth = null;
+
+    // Atualiza indicadores visuais de hardware na tela
+    function atualizarStatusHardware() {
+      const usbTexto = document.getElementById('statusUsbTexto');
+      const usbBadge = document.getElementById('statusUsbBadge');
+      if (portaUsbAtiva) {
+        usbTexto.textContent = "Conectada (ESC/POS USB)";
+        usbTexto.className = "text-xs font-black text-amber-400";
+        usbBadge.className = "w-2.5 h-2.5 rounded-full bg-amber-400";
+      }
+
+      const btTexto = document.getElementById('statusBtTexto');
+      const btBadge = document.getElementById('statusBtBadge');
+      if (caracteristicaGattBluetooth) {
+        btTexto.textContent = "Pareada (ESC/POS BT)";
+        btTexto.className = "text-xs font-black text-cyan-400";
+        btBadge.className = "w-2.5 h-2.5 rounded-full bg-cyan-400";
+      }
+    }
+
+    // ==========================================
+    // 🛠️ MÓDULO DE CONEXÃO DE HARDWARE
+    // ==========================================
+
+    // Conectar via Cabo USB (Recomendado para Computador/Notebook)
+    async function conectarImpressoraUSB() {
+        try {
+            portaUsbAtiva = await navigator.serial.requestPort();
+            await portaUsbAtiva.open({ baudRate: 9600 });
+            atualizarStatusHardware();
+            alert("✅ Impressora USB Conectada com Sucesso!");
+        } catch (erro) {
+            console.error("Erro ao conectar USB:", erro);
+            alert("Falha ao abrir porta USB. Verifique o cabo.");
+        }
+    }
+
+    // Conectar via Bluetooth (Recomendado para Celular/Tablet ou impressora sem fio)
+    async function conectarImpressoraBluetooth() {
+        try {
+            // Busca serviços de impressão comuns (UUID genérico de escrita serial bluetooth)
+            dispositivoBluetoothAtivo = await navigator.bluetooth.requestDevice({
+                filters: [{ services: ['00001101-0000-1000-8000-00805f9b34fb'] }],
+                optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Alternativo para algumas chinesas
+            });
+            
+            const servidorGatt = await dispositivoBluetoothAtivo.gatt.connect();
+            // Busca as características de envio de dados
+            const servico = await servidorGatt.getPrimaryService('00001101-0000-1000-8000-00805f9b34fb');
+            const caracteristicas = await servico.getCharacteristics();
+            
+            // Pega a primeira característica que aceite escrita de dados
+            caracteristicaGattBluetooth = caracteristicas.find(c => c.properties.write || c.properties.writeWithoutResponse);
+            
+            atualizarStatusHardware();
+            alert("✅ Impressora Bluetooth Pareada com Sucesso!");
+        } catch (erro) {
+            console.error("Erro Bluetooth:", erro);
+            alert("Não conseguimos parear com a impressora Bluetooth.");
+        }
+    }
+
+    // ==========================================
+    // 📄 MÓDULO DE MONTAGEM E ENVIO DO CUPOM (ESC/POS)
+    // ==========================================
+
+    async function enviarParaImpressora(textoCupom) {
+        const encoder = new TextEncoder();
+        const bytesDados = encoder.encode(textoCupom);
+
+        // Comandos hexadecimais ESC/POS clássicos de controle
+        const C_INICIALIZAR = new Uint8Array([0x1B, 0x40]);
+        const C_CORTE_GUILHOTINA = new Uint8Array([0x1D, 0x56, 0x41, 0x03]); // Comando para cortar papel
+        const C_AVANCO_PAPEL = new Uint8Array([0x1B, 0x64, 0x04]); // Pula 4 linhas no final
+
+        // Junta todos os comandos em um único bloco de bytes
+        const blobFinal = new Uint8Array(C_INICIALIZAR.length + bytesDados.length + C_AVANCO_PAPEL.length + C_CORTE_GUILHOTINA.length);
+        blobFinal.set(C_INICIALIZAR, 0);
+        blobFinal.set(bytesDados, C_INICIALIZAR.length);
+        blobFinal.set(C_AVANCO_PAPEL, C_INICIALIZAR.length + bytesDados.length);
+        blobFinal.set(C_CORTE_GUILHOTINA, C_INICIALIZAR.length + bytesDados.length + C_AVANCO_PAPEL.length);
+
+        // Fluxo 1: Se estiver imprimindo via USB
+        if (portaUsbAtiva && portaUsbAtiva.writable) {
+            const escritor = portaUsbAtiva.writable.getWriter();
+            await escritor.write(blobFinal);
+            escritor.releaseLock();
+            console.log("Cupom impresso via USB!");
+        } 
+        // Fluxo 2: Se estiver imprimindo via Bluetooth
+        else if (caracteristicaGattBluetooth) {
+            // O Bluetooth envia dados em pacotes pequenos (geralmente de até 20 bytes por vez)
+            const tamanhoPacote = 20;
+            for (let i = 0; i < blobFinal.length; i += tamanhoPacote) {
+                const pacote = blobFinal.slice(i, i + tamanhoPacote);
+                await caracteristicaGattBluetooth.writeValue(pacote);
+            }
+            console.log("Cupom impresso via Bluetooth!");
+        } else {
+            console.log("Nenhuma impressora conectada no hardware. Salvando impressão em log.");
+        }
+    }
+
+    // Transforma o objeto do Firebase em um layout de texto limpo para bobina térmica
+    window.imprimirComandaCozinha = function(pedido) {
+        let cupom = `================================\n`;
+        cupom += `       DOM GABRIEL HAMBURGUERIA \n`;
+        cupom += `================================\n`;
+        cupom += `💥 COMANDA: #${(pedido.id || '0000').substring(0,5).toUpperCase()}\n`;
+        cupom += `Modo: ${pedido.tipo === 'mesa' ? '🪑 MESA ' + (pedido.mesa || '01') : '🛵 DELIVERY'}\n`;
+        cupom += `Cliente: ${pedido.cliente || pedido.clienteNome || 'Cliente'}\n`;
+        cupom += `--------------------------------\n`;
+        cupom += `📋 ITENS PARA A CHAPA:\n`;
+        
+        if (pedido.itens && pedido.itens.length > 0) {
+            pedido.itens.forEach(item => {
+                if (typeof item === 'string') {
+                    cupom += `• ${item}\n`;
+                } else if (item && typeof item === 'object') {
+                    const q = item.quantidade || 1;
+                    const n = item.nome || 'Item';
+                    const extras = item.adicionais ? ' [' + item.adicionais.join(', ') + ']' : '';
+                    cupom += `• ${q}x ${n}${extras}\n`;
+                }
+            });
+        }
+
+        cupom += `--------------------------------\n`;
+        if (pedido.observacao || pedido.observacoes) {
+            cupom += `⚠️ OBS: ${pedido.observacao || pedido.observacoes}\n`;
+        }
+        cupom += `Horario: ${new Date().toLocaleTimeString('pt-BR')}\n`;
+        cupom += `================================\n`;
+
+        enviarParaImpressora(cupom);
+    };
+
+    // Vínculo dos botões da interface aos métodos
+    document.getElementById('btnConectarUSB').addEventListener('click', conectarImpressoraUSB);
+    document.getElementById('btnConectarBluetooth').addEventListener('click', conectarImpressoraBluetooth);
+    document.getElementById('btnTestarImpressao').addEventListener('click', () => {
+        window.imprimirComandaCozinha({
+            id: 'TESTE-999',
+            tipo: 'mesa',
+            mesa: '05',
+            cliente: 'Teste Chapa',
+            itens: [
+                '1x Dom Gabriel Supremo [+ Extra Bacon]',
+                '1x Batata Rústica com Alecrim'
+            ],
+            observacao: 'Ponto da carne: Ao ponto para mal passado'
+        });
+    });
+
+    // ==========================================
+    // 📡 GATILHO EM TEMPO REAL (FIREBASE)
+    // ==========================================
+
+    let primeiraCarga = true;
+
+    // Escuta a entrada de novos pedidos e dispara o papel sem clique manual
+    onSnapshot(collection(db, "pedidos"), (snapshot) => {
+        const pedidosMap = [];
+        snapshot.forEach((d) => {
+            pedidosMap.push({ id: d.id, ...d.data() });
+        });
+
+        // Atualiza a listagem na interface
+        document.getElementById('contadorPedidos').textContent = `${pedidosMap.length} pedidos`;
+        const container = document.getElementById('listaPedidos');
+        if (pedidosMap.length === 0) {
+            container.innerHTML = `<div class="col-span-full py-8 text-center text-zinc-500 text-xs">Nenhum pedido encontrado no Firebase.</div>`;
+        } else {
+            container.innerHTML = pedidosMap.map(p => `
+                <div class="p-3.5 bg-[#12131a] border border-[#282a36] rounded-xl flex flex-col justify-between gap-3">
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <span class="text-xs font-mono font-bold text-amber-400">#${(p.numeroPedido || p.id).slice(-4)}</span>
+                      <h3 class="text-sm font-bold text-white">${p.clienteNome || p.cliente || 'Cliente'}</h3>
+                      <p class="text-[11px] text-zinc-400">${p.endereco || (p.tipo === 'mesa' ? 'Mesa ' + (p.mesa || '01') : 'Balcão')}</p>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                      p.status === 'pendente' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                      p.status === 'preparando' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' :
+                      'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    }">${p.status || 'pendente'}</span>
+                  </div>
+                  <div class="flex items-center justify-between pt-2 border-t border-[#222432]">
+                    <span class="text-xs font-mono font-bold text-emerald-400">R$ ${(Number(p.total) || 0).toFixed(2).replace('.', ',')}</span>
+                    <button type="button" onclick='window.imprimirComandaCozinha(${JSON.stringify(p)})' class="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold rounded-lg border border-zinc-700 flex items-center gap-1 cursor-pointer">
+                      🖨️ Imprimir
+                    </button>
+                  </div>
+                </div>
+            `).join('');
+        }
+
+        // Detecta novas inclusões em tempo real
+        snapshot.docChanges().forEach((change) => {
+            // Identifica apenas novos documentos inseridos na coleção de pedidos
+            if (change.type === "added") {
+                const novoPedido = change.doc.data();
+                novoPedido.id = change.doc.id;
+
+                // Se o status for pendente (lançado na mesa pelo garçom ou pelo cliente em casa), imprime automaticamente!
+                if (!primeiraCarga && (novoPedido.status === "pendente" || novoPedido.status === "novo")) {
+                    window.imprimirComandaCozinha(novoPedido);
+                }
+            }
+        });
+        primeiraCarga = false;
+    });
+  </script>
+</body>
+</html>

@@ -31,6 +31,7 @@ import {
 import { db, doc, setDoc, updateDoc, onSnapshot, collection } from '../services/firebase';
 import { MenuItem, RestaurantConfig, ComandaLocal, ComandaPedidoItem, MovimentoCaixa } from '../types';
 import { CATEGORIES } from '../data/initialMenu';
+import { imprimirCupomCozinha, imprimirCupomComandaLocal, testarImpressoraTermica, conectarImpressoraBluetooth } from '../utils/thermalPrinter';
 
 interface AtendimentoLocalPanelProps {
   restaurant: RestaurantConfig;
@@ -237,9 +238,29 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
   const [obsLancar, setObsLancar] = useState('');
   const [feedbackLancamento, setFeedbackLancamento] = useState<string | null>(null);
 
+  // Estado da Impressora Térmica USB/Serial
+  const [feedbackImpressora, setFeedbackImpressora] = useState<string | null>(null);
+  const [imprimindoSerial, setImprimindoSerial] = useState(false);
+
   // Filtro de Comandas no Salão
   const [filtroStatusComanda, setFiltroStatusComanda] = useState<'todas' | 'mesas' | 'balcao'>('todas');
   const [buscaComanda, setBuscaComanda] = useState('');
+
+  // Modo de Visualização do Salão: 'quadradinhos' (Grid Visual de Mesas) | 'cards' (Cards detalhados)
+  const [modoVisualSalao, setModoVisualSalao] = useState<'quadradinhos' | 'cards'>('quadradinhos');
+  const [totalMesasConfiguradas, setTotalMesasConfiguradas] = useState<number>(() => {
+    try {
+      const v = localStorage.getItem('totalMesasLayout');
+      if (v && parseInt(v) > 0) return parseInt(v);
+    } catch {}
+    return 15;
+  });
+
+  // Modal Flutuante de Lançamento Rápido na Mesa do Grid
+  const [modalMesaVisualAberta, setModalMesaVisualAberta] = useState(false);
+  const [mesaVisualNum, setMesaVisualNum] = useState<number | null>(null);
+  const [nomeClienteMesaVisual, setNomeClienteMesaVisual] = useState('');
+  const [produtoMesaVisual, setProdutoMesaVisual] = useState<string>('');
 
   // 1. ABRIR NOVA COMANDA
   const handleCriarComanda = async (e: React.FormEvent) => {
@@ -478,6 +499,106 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
     }
   };
 
+  // 5. IMPRESSÃO TÉRMICA USB / SERIAL (ESC/POS)
+  const handleImprimirCozinha = async (cmd: ComandaLocal) => {
+    if (!cmd.itens || cmd.itens.length === 0) {
+      alert('Esta comanda não possui itens para envio à cozinha.');
+      return;
+    }
+
+    setImprimindoSerial(true);
+    try {
+      const itensFormatados = cmd.itens.map((it) => {
+        let linha = `${it.quantidade}x ${it.nome}`;
+        if (it.adicionais && it.adicionais.length > 0) {
+          linha += ` [+ ${it.adicionais.join(', ')}]`;
+        }
+        if (it.observacao) {
+          linha += ` (Obs: ${it.observacao})`;
+        }
+        return linha;
+      });
+
+      const res = await imprimirCupomCozinha({
+        id: cmd.id,
+        numeroPedido: cmd.numeroComanda,
+        tipo: cmd.tipo,
+        mesa: cmd.numeroMesa,
+        cliente: cmd.clienteNome,
+        telefone: cmd.clienteTelefone,
+        itens: itensFormatados,
+        observacao: cmd.observacoes,
+        total: cmd.total,
+      });
+
+      setFeedbackImpressora(res.mensagem);
+      setTimeout(() => setFeedbackImpressora(null), 4500);
+    } catch (err: any) {
+      alert(`Erro de comunicação com a impressora térmica: ${err?.message || 'Verifique se está conectada ao USB!'}`);
+    } finally {
+      setImprimindoSerial(false);
+    }
+  };
+
+  const handleImprimirComprovanteTermica = async (cmd: ComandaLocal) => {
+    setImprimindoSerial(true);
+    try {
+      const res = await imprimirCupomComandaLocal({
+        numeroComanda: cmd.numeroComanda,
+        tipo: cmd.tipo,
+        numeroMesa: cmd.numeroMesa,
+        clienteNome: cmd.clienteNome,
+        atendente: cmd.atendente,
+        itens: cmd.itens.map((it) => ({
+          nome: it.nome,
+          quantidade: it.quantidade,
+          preco: it.preco,
+          adicionais: it.adicionais,
+        })),
+        subtotal: cmd.subtotal,
+        taxaServico: cmd.taxaServico,
+        desconto: cmd.desconto,
+        total: cmd.total,
+        formaPagamento: cmd.formaPagamento,
+        troco: cmd.troco,
+        restauranteNome: restaurant.name,
+      });
+
+      setFeedbackImpressora(res.mensagem);
+      setTimeout(() => setFeedbackImpressora(null), 4500);
+    } catch (err: any) {
+      alert(`Erro ao imprimir na impressora térmica: ${err?.message || 'Verifique o cabo USB.'}`);
+    } finally {
+      setImprimindoSerial(false);
+    }
+  };
+
+  const handleTestarImpressora = async () => {
+    setImprimindoSerial(true);
+    try {
+      const res = await testarImpressoraTermica();
+      setFeedbackImpressora(res.mensagem);
+      setTimeout(() => setFeedbackImpressora(null), 4500);
+    } catch (err: any) {
+      alert(`Erro no teste da impressora térmica: ${err?.message || 'Verifique a porta USB.'}`);
+    } finally {
+      setImprimindoSerial(false);
+    }
+  };
+
+  const handleConectarBluetooth = async () => {
+    setImprimindoSerial(true);
+    try {
+      const res = await conectarImpressoraBluetooth();
+      setFeedbackImpressora(res.mensagem);
+      setTimeout(() => setFeedbackImpressora(null), 4500);
+    } catch (err: any) {
+      alert(`Erro Bluetooth: ${err?.message || 'Falha no pareamento sem fio.'}`);
+    } finally {
+      setImprimindoSerial(false);
+    }
+  };
+
   // Indicadores
   const comandasAbertas = comandas.filter((c) => c.status === 'aberta' || c.status === 'fechando');
   const comandasPagasHoje = comandas.filter((c) => c.status === 'paga');
@@ -600,8 +721,47 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
             <TrendingUp className="w-3.5 h-3.5" />
             <span>📊 Caixa do Dia</span>
           </button>
+
+          {/* Conexão Bluetooth Sem Fio */}
+          <button
+            type="button"
+            onClick={handleConectarBluetooth}
+            disabled={imprimindoSerial}
+            title="Conectar impressora térmica Bluetooth (Celular, Tablet ou sem fio)"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap bg-zinc-900/90 hover:bg-zinc-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-500/60 shadow-xs disabled:opacity-50"
+          >
+            <span>📱 Bluetooth</span>
+          </button>
+
+          {/* Teste Rápido de Impressora Térmica USB/Serial */}
+          <button
+            type="button"
+            onClick={handleTestarImpressora}
+            disabled={imprimindoSerial}
+            title="Conectar e testar impressora térmica USB/Serial cadastrada (ESC/POS 9600 baud)"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap bg-zinc-900/90 hover:bg-zinc-800 text-orange-400 hover:text-orange-300 border border-orange-500/30 hover:border-orange-500/60 shadow-xs disabled:opacity-50"
+          >
+            <Printer className="w-3.5 h-3.5 text-orange-400" />
+            <span className="hidden sm:inline">Testar Térmica USB</span>
+          </button>
         </div>
       </header>
+
+      {/* Alerta / Feedback de Impressão Térmica */}
+      {feedbackImpressora && (
+        <div className="bg-gradient-to-r from-orange-950/95 via-amber-950/95 to-black border-b border-orange-500/40 text-orange-200 px-4 sm:px-8 py-2.5 text-xs font-bold flex items-center justify-between shadow-lg animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <Printer className="w-4 h-4 text-orange-400 shrink-0 animate-bounce" />
+            <span>{feedbackImpressora}</span>
+          </div>
+          <button
+            onClick={() => setFeedbackImpressora(null)}
+            className="text-orange-400 hover:text-white p-1 rounded-md"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* ÁREA DE CONTEÚDO */}
       <main className="p-4 sm:p-6 lg:p-8 flex-1 overflow-y-auto">
@@ -674,9 +834,37 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
               </div>
             </div>
 
-            {/* Filtros e Busca de Comandas */}
+            {/* Filtros, Busca e Seletor de Visualização (Grid Visual vs Cards) */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-[#1a1a1e] border border-[#29292e]">
               <div className="flex items-center gap-1.5 overflow-x-auto">
+                {/* Seletor Visual Quadradinhos vs Cards */}
+                <div className="flex items-center p-0.5 rounded-lg bg-[#14151e] border border-[#29292e] mr-2">
+                  <button
+                    type="button"
+                    onClick={() => setModoVisualSalao('quadradinhos')}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                      modoVisualSalao === 'quadradinhos'
+                        ? 'bg-[#ff9f1c] text-black shadow-xs'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                    title="Grid Visual Dinâmico de Mesas com Quadradinhos Coloridos"
+                  >
+                    <span>🪑 Grid Visual</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModoVisualSalao('cards')}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                      modoVisualSalao === 'cards'
+                        ? 'bg-cyan-500 text-black shadow-xs'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                    title="Cards Detalhados com Itens e Histórico"
+                  >
+                    <span>📋 Lista Cards</span>
+                  </button>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => setFiltroStatusComanda('todas')}
@@ -712,19 +900,120 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                 </button>
               </div>
 
-              <div className="relative w-full sm:w-64">
-                <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Buscar mesa ou cliente..."
-                  value={buscaComanda}
-                  onChange={(e) => setBuscaComanda(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 bg-[#14151e] border border-[#29292e] rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-cyan-400"
-                />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const novo = prompt('Quantas mesas seu salão possui?', String(totalMesasConfiguradas));
+                    if (novo && !isNaN(parseInt(novo)) && parseInt(novo) > 0) {
+                      const qtd = parseInt(novo);
+                      setTotalMesasConfiguradas(qtd);
+                      try {
+                        localStorage.setItem('totalMesasLayout', String(qtd));
+                      } catch {}
+                    }
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#202024] hover:bg-[#28282e] border border-[#29292e] text-zinc-300 hover:text-white text-xs font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                  title="Configurar quantidade total de mesas do salão"
+                >
+                  <span>⚙️ Qtd de Mesas</span>
+                  <span className="font-mono text-cyan-400">({totalMesasConfiguradas})</span>
+                </button>
+
+                <div className="relative w-full sm:w-56">
+                  <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Buscar mesa ou cliente..."
+                    value={buscaComanda}
+                    onChange={(e) => setBuscaComanda(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 bg-[#14151e] border border-[#29292e] rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-cyan-400"
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Grid das Comandas */}
+            {/* SE MODO FOR GRID VISUAL (QUADRADINHOS DINÂMICOS DO SALÃO) */}
+            {modoVisualSalao === 'quadradinhos' && (
+              <div className="p-5 rounded-2xl bg-[#14151a] border border-[#29292e] shadow-xl space-y-4">
+                {/* Legenda de Cores de Status */}
+                <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-[#29292e]">
+                  <div className="flex items-center gap-4 text-xs font-bold">
+                    <span className="flex items-center gap-1.5 text-zinc-300">
+                      <span className="w-3.5 h-3.5 rounded-md bg-[#00b37e] inline-block shadow-[0_0_8px_rgba(0,179,126,0.5)]"></span>
+                      <span>Livre (Verde)</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 text-zinc-300">
+                      <span className="w-3.5 h-3.5 rounded-md bg-[#ff9f1c] inline-block shadow-[0_0_8px_rgba(255,159,28,0.5)]"></span>
+                      <span>Ocupada (Laranja)</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 text-zinc-300">
+                      <span className="w-3.5 h-3.5 rounded-md bg-[#dc3545] inline-block shadow-[0_0_8px_rgba(220,53,69,0.5)]"></span>
+                      <span>Pendente / Chapa (Vermelho)</span>
+                    </span>
+                  </div>
+
+                  <span className="text-[11px] text-zinc-400">
+                    💡 Clique em qualquer quadradinho para lançar na comanda ou fechar a conta.
+                  </span>
+                </div>
+
+                {/* Grid dos Quadradinhos */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 gap-3 max-w-5xl mx-auto py-2">
+                  {Array.from({ length: totalMesasConfiguradas }, (_, i) => i + 1).map((numMesa) => {
+                    const comandaMesa = comandas.find(
+                      (c) => c.tipo === 'mesa' && c.numeroMesa === numMesa && (c.status === 'aberta' || c.status === 'fechando')
+                    );
+
+                    let statusMesa: 'livre' | 'ocupada' | 'pendente' = 'livre';
+                    let corBg = 'bg-[#00b37e] text-white hover:brightness-110 shadow-[0_4px_12px_rgba(0,179,126,0.25)]';
+
+                    if (comandaMesa) {
+                      const temItensPendentes = comandaMesa.itens.length > 0 && comandaMesa.status !== 'fechando';
+                      if (temItensPendentes && comandaMesa.status === 'aberta') {
+                        statusMesa = 'pendente';
+                        corBg = 'bg-[#dc3545] text-white hover:brightness-110 shadow-[0_4px_12px_rgba(220,53,69,0.35)] animate-pulse';
+                      } else {
+                        statusMesa = 'ocupada';
+                        corBg = 'bg-[#ff9f1c] text-white hover:brightness-110 shadow-[0_4px_12px_rgba(255,159,28,0.35)]';
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={numMesa}
+                        onClick={() => {
+                          setMesaVisualNum(numMesa);
+                          if (comandaMesa) {
+                            setNomeClienteMesaVisual(comandaMesa.clienteNome || '');
+                          } else {
+                            setNomeClienteMesaVisual('');
+                          }
+                          setProdutoMesaVisual('');
+                          setModalMesaVisualAberta(true);
+                        }}
+                        className={`h-20 sm:h-22 rounded-2xl p-2 flex flex-col justify-center items-center font-bold cursor-pointer transition-all duration-200 transform hover:scale-105 select-none border border-white/10 ${corBg}`}
+                      >
+                        <span className="text-xl sm:text-2xl font-black tracking-tight leading-none">
+                          {String(numMesa).padStart(2, '0')}
+                        </span>
+                        <span className="text-[10px] font-black tracking-wider uppercase mt-1 opacity-90">
+                          {statusMesa.toUpperCase()}
+                        </span>
+                        {comandaMesa && (
+                          <span className="text-[9px] font-mono font-bold mt-0.5 opacity-95">
+                            R$ {(comandaMesa.total || 0).toFixed(2).replace('.', ',')}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* SE MODO FOR CARDS DETALHADOS (OU COMPLEMENTAR) */}
+            {modoVisualSalao === 'cards' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {comandasFiltradas.length === 0 ? (
                 <div className="col-span-full p-12 text-center rounded-2xl bg-[#1a1a1e] border border-dashed border-[#29292e] text-[#8d8d99]">
@@ -849,7 +1138,7 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                       </div>
 
                       {/* Botões de Ação da Comanda */}
-                      <div className="mt-4 pt-2.5 border-t border-[#29292e] flex items-center gap-2">
+                      <div className="mt-4 pt-2.5 border-t border-[#29292e] flex items-center gap-1.5">
                         {isAberta ? (
                           <>
                             <button
@@ -862,6 +1151,17 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>Lançar</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleImprimirCozinha(cmd)}
+                              disabled={!cmd.itens.length || imprimindoSerial}
+                              title="Imprimir cupom para chapa/cozinha direto na impressora térmica USB"
+                              className="py-2 px-2.5 rounded-lg bg-orange-950/70 hover:bg-orange-900 border border-orange-700/60 text-orange-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
+                            >
+                              <Printer className="w-3.5 h-3.5 text-orange-400" />
+                              <span className="hidden sm:inline">Cozinha</span>
                             </button>
 
                             <button
@@ -895,6 +1195,7 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                 })
               )}
             </div>
+            )}
           </div>
         )}
 
@@ -1106,13 +1407,23 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                     </div>
 
                     {/* Total e Ações */}
-                    <div className="pt-3 border-t border-[#29292e] space-y-3">
+                    <div className="pt-3 border-t border-[#29292e] space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-zinc-400">Total da Comanda:</span>
                         <span className="text-2xl font-black text-[#00b37e] tabular-nums font-mono">
                           R$ {comandaAtual.total.toFixed(2).replace('.', ',')}
                         </span>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleImprimirCozinha(comandaAtual)}
+                        disabled={!comandaAtual.itens.length || imprimindoSerial}
+                        className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all"
+                      >
+                        <Printer className="w-4 h-4" />
+                        <span>🖨️ Imprimir Pedido p/ Cozinha / Chapa (USB)</span>
+                      </button>
 
                       <button
                         type="button"
@@ -1923,19 +2234,28 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
               Obrigado pela preferência! Volte sempre! 🍔❤️
             </div>
 
-            <div className="mt-4 flex items-center gap-2 font-sans">
+            <div className="mt-4 flex flex-col sm:flex-row items-center gap-2 font-sans">
+              <button
+                type="button"
+                onClick={() => comandaRecibo && handleImprimirComprovanteTermica(comandaRecibo)}
+                disabled={imprimindoSerial}
+                className="w-full sm:flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-black font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Imprimir Térmica USB</span>
+              </button>
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="flex-1 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
+                title="Impressão Padrão do Navegador (A4)"
               >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Imprimir</span>
+                <span>A4 / Janela</span>
               </button>
               <button
                 type="button"
                 onClick={() => setReciboModalAberto(false)}
-                className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer"
               >
                 Concluir
               </button>
@@ -2008,6 +2328,257 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL VISUAL FLUTUANTE DE LANÇAMENTO DA MESA DO GRID           */}
+      {/* ============================================================== */}
+      {modalMesaVisualAberta && mesaVisualNum !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-[#1a1a1e] border border-[#29292e] rounded-2xl p-5 sm:p-6 w-full max-w-md shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#29292e]">
+              <div className="flex items-center gap-2.5">
+                <span className="w-9 h-9 rounded-xl bg-amber-500 text-black font-black text-lg flex items-center justify-center">
+                  {String(mesaVisualNum).padStart(2, '0')}
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-white leading-tight">
+                    Comanda da Mesa {String(mesaVisualNum).padStart(2, '0')}
+                  </h3>
+                  <span className="text-xs text-zinc-400">
+                    {(() => {
+                      const c = comandas.find(
+                        (cmd) => cmd.tipo === 'mesa' && cmd.numeroMesa === mesaVisualNum && (cmd.status === 'aberta' || cmd.status === 'fechando')
+                      );
+                      return c ? `🟢 Ocupada • ${c.itens.length} itens` : '⚪ Mesa Livre no Salão';
+                    })()}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setModalMesaVisualAberta(false)}
+                className="text-zinc-400 hover:text-white p-1 text-2xl font-bold leading-none cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Consumo Atual da Mesa (Se já ocupada) */}
+            {(() => {
+              const c = comandas.find(
+                (cmd) => cmd.tipo === 'mesa' && cmd.numeroMesa === mesaVisualNum && (cmd.status === 'aberta' || cmd.status === 'fechando')
+              );
+              if (!c || c.itens.length === 0) return null;
+
+              return (
+                <div className="bg-[#202024] p-3.5 rounded-xl border border-[#29292e] space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#ff9f1c]">
+                    <span>📋 Itens já consumidos na mesa:</span>
+                    <span className="font-mono text-emerald-400 font-black">
+                      R$ {(c.total || 0).toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                  <div className="space-y-1 max-h-36 overflow-y-auto text-xs text-zinc-300 pr-1">
+                    {c.itens.map((it, idx) => (
+                      <div key={idx} className="flex justify-between items-center py-0.5 border-b border-white/5">
+                        <span>
+                          • {it.quantidade}x {it.nome}
+                          {it.adicionais && it.adicionais.length > 0 ? ` [${it.adicionais.join(', ')}]` : ''}
+                        </span>
+                        <span className="font-mono text-[11px] text-zinc-400">
+                          R$ {(it.preco * it.quantidade).toFixed(2).replace('.', ',')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Formulário de Lançamento */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 mb-1">Nome do Cliente na Mesa:</label>
+                <input
+                  type="text"
+                  placeholder={`Ex: Cliente Mesa ${mesaVisualNum}`}
+                  value={nomeClienteMesaVisual}
+                  onChange={(e) => setNomeClienteMesaVisual(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#202024] border border-[#29292e] rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-cyan-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 mb-1">Selecione o Hambúrguer / Produto:</label>
+                <select
+                  value={produtoMesaVisual}
+                  onChange={(e) => setProdutoMesaVisual(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#202024] border border-[#29292e] rounded-xl text-xs text-white focus:outline-hidden focus:border-cyan-400"
+                >
+                  <option value="">Selecione um item do cardápio...</option>
+                  {menuItems.map((m) => (
+                    <option key={m.id} value={`${m.id}|${m.name}|${m.price}`}>
+                      {m.name} - R$ {m.price.toFixed(2).replace('.', ',')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Botão de Disparo para a Cozinha */}
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!produtoMesaVisual) {
+                    alert('Selecione um hambúrguer ou produto para lançar.');
+                    return;
+                  }
+
+                  const [, nomeItem, precoItemStr] = produtoMesaVisual.split('|');
+                  const precoItem = parseFloat(precoItemStr) || 0;
+                  const nomeCliente = nomeClienteMesaVisual.trim() || `Mesa ${mesaVisualNum}`;
+
+                  const comandaExistente = comandas.find(
+                    (cmd) => cmd.tipo === 'mesa' && cmd.numeroMesa === mesaVisualNum && (cmd.status === 'aberta' || cmd.status === 'fechando')
+                  );
+
+                  if (comandaExistente) {
+                    // Adiciona na comanda existente
+                    const novoItem: ComandaPedidoItem = {
+                      id: `it-${Date.now()}`,
+                      itemId: `pr-${Date.now()}`,
+                      nome: nomeItem,
+                      preco: precoItem,
+                      quantidade: 1,
+                      horaLancamento: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                    };
+
+                    const novosItens = [...comandaExistente.itens, novoItem];
+                    const novoSub = novosItens.reduce((acc, it) => acc + it.preco * it.quantidade, 0);
+
+                    const atualizada: ComandaLocal = {
+                      ...comandaExistente,
+                      clienteNome: nomeCliente,
+                      itens: novosItens,
+                      subtotal: novoSub,
+                      total: novoSub,
+                    };
+
+                    salvarComandas(comandas.map((c) => (c.id === comandaExistente.id ? atualizada : c)));
+
+                    // Dispara impressão na cozinha
+                    try {
+                      await imprimirCupomCozinha({
+                        id: comandaExistente.id,
+                        tipo: 'mesa',
+                        mesa: mesaVisualNum,
+                        cliente: nomeCliente,
+                        itens: [`1x ${nomeItem}`],
+                        total: novoSub,
+                      });
+                    } catch {}
+
+                    try {
+                      await updateDoc(doc(db, 'comandas', comandaExistente.id), {
+                        itens: novosItens,
+                        subtotal: novoSub,
+                        total: novoSub,
+                        status: 'aberta',
+                      });
+                    } catch {}
+                  } else {
+                    // Cria nova comanda na mesa
+                    const nova: ComandaLocal = {
+                      id: `cmd-${Date.now()}`,
+                      numeroComanda: `M-${String(mesaVisualNum).padStart(2, '0')}`,
+                      tipo: 'mesa',
+                      numeroMesa: mesaVisualNum,
+                      clienteNome: nomeCliente,
+                      atendente: 'Garçom Salão',
+                      itens: [
+                        {
+                          id: `it-${Date.now()}`,
+                          itemId: `pr-${Date.now()}`,
+                          nome: nomeItem,
+                          preco: precoItem,
+                          quantidade: 1,
+                          horaLancamento: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                        },
+                      ],
+                      status: 'aberta',
+                      subtotal: precoItem,
+                      total: precoItem,
+                      abertaEm: new Date().toISOString(),
+                    };
+
+                    salvarComandas([nova, ...comandas]);
+
+                    // Dispara impressão na cozinha
+                    try {
+                      await imprimirCupomCozinha({
+                        id: nova.id,
+                        tipo: 'mesa',
+                        mesa: mesaVisualNum,
+                        cliente: nomeCliente,
+                        itens: [`1x ${nomeItem}`],
+                        total: precoItem,
+                      });
+                    } catch {}
+
+                    try {
+                      await setDoc(doc(db, 'comandas', nova.id), nova);
+                    } catch {}
+                  }
+
+                  // Notifica no Firebase coleção 'pedidos' para os monitores de cozinha
+                  try {
+                    const novoPedidoRef = doc(collection(db, 'pedidos'));
+                    await setDoc(novoPedidoRef, {
+                      cliente: nomeCliente,
+                      tipo: 'mesa',
+                      mesa: mesaVisualNum,
+                      numeroMesa: mesaVisualNum,
+                      itens: [`1x ${nomeItem}`],
+                      total: precoItem,
+                      status: 'pendente',
+                      criadoEm: new Date().toISOString(),
+                    });
+                  } catch {}
+
+                  alert(`🔥 Pedido de 1x ${nomeItem} lançado na Mesa ${mesaVisualNum} e enviado para a chapa!`);
+                  setModalMesaVisualAberta(false);
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#ff4b2b] to-red-600 hover:from-red-600 hover:to-red-700 text-white font-extrabold text-xs sm:text-sm transition-all shadow-[0_4px_14px_rgba(255,75,43,0.3)] cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>🔥 Lançar e Imprimir na Cozinha</span>
+              </button>
+
+              {/* Botão de Fechar Conta e Liberar Mesa (Se houver comanda aberta) */}
+              {(() => {
+                const c = comandas.find(
+                  (cmd) => cmd.tipo === 'mesa' && cmd.numeroMesa === mesaVisualNum && (cmd.status === 'aberta' || cmd.status === 'fechando')
+                );
+                if (!c) return null;
+
+                return (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComandaSelecionadaId(c.id);
+                      setModalMesaVisualAberta(false);
+                      setSubAba('caixa');
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl bg-transparent border border-[#00b37e] hover:bg-[#00b37e]/15 text-[#00b37e] font-extrabold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <span>💳 Fechar Conta e Liberar Mesa</span>
+                  </button>
+                );
+              })()}
+            </div>
           </div>
         </div>
       )}

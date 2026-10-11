@@ -86,6 +86,9 @@ export interface DeliveryOrder {
   numeroPedido: number | string;
   clienteNome: string;
   clienteTelefone?: string;
+  tipo?: string;
+  mesa?: string;
+  numeroMesa?: string;
   endereco: string;
   complemento?: string;
   bairro?: string;
@@ -152,4 +155,14 @@ export interface MovimentoCaixa {
   valor: number;
   dataHora: string;
   responsavel?: string;
+}
+
+export interface EstoqueInsumo {
+  id: string;
+  nome: string;
+  categoria: 'carnes' | 'paes' | 'frios' | 'hortifruti' | 'embalagens' | 'bebidas' | string;
+  quantidade: number;
+  unidade: 'un' | 'kg' | 'pct' | 'cx' | string;
+  minimo: number;
+  atualizadoEm?: string;
 }

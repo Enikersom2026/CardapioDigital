@@ -18,9 +18,20 @@ import {
   Package,
   LayoutGrid,
   Check,
+  Printer,
+  FileText,
 } from 'lucide-react';
 import { db, doc, updateDoc, onSnapshot, collection, setDoc } from '../services/firebase';
 import { DeliveryOrder, RestaurantConfig } from '../types';
+import {
+  imprimirCupomCozinha,
+  imprimirCupomEntrega,
+  testarImpressoraTermica,
+  conectarImpressoraBluetooth,
+  conectarImpressoraUSB,
+  isSerialSupported,
+  isBluetoothSupported,
+} from '../utils/thermalPrinter';
 
 interface DeliveryPanelProps {
   restaurant: RestaurantConfig;
@@ -109,6 +120,106 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
   } | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pendentes' | 'saiu' | 'entregues'>('todos');
   const [sincronizandoFirebase, setSincronizandoFirebase] = useState(false);
+  const [toastImpressao, setToastImpressao] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+
+  // Auto-impressão de cupom para a cozinha ao receber novo pedido no Firebase
+  const [autoPrintCozinha, setAutoPrintCozinha] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('domgabriel_autoprint_cozinha') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  const autoPrintCozinhaRef = useRef(autoPrintCozinha);
+  autoPrintCozinhaRef.current = autoPrintCozinha;
+  const primeiraCargaRef = useRef(true);
+
+  // Ações de Impressão Térmica Direta USB / Serial (ESC/POS)
+  const handleImprimirCozinha = async (pedido: DeliveryOrder) => {
+    try {
+      const res = await imprimirCupomCozinha({
+        id: pedido.id,
+        numeroPedido: pedido.numeroPedido,
+        tipo: 'delivery',
+        cliente: pedido.clienteNome,
+        itens: pedido.itens.map((it) => ({
+          nome: it.nome,
+          quantidade: it.quantidade,
+          preco: it.preco,
+          adicionais: it.adicionais,
+          observacao: it.observacao,
+        })),
+        observacao: pedido.observacoes,
+      });
+      setToastImpressao({ tipo: res.sucesso ? 'ok' : 'erro', texto: res.mensagem });
+      setTimeout(() => setToastImpressao(null), 4000);
+    } catch (e: any) {
+      setToastImpressao({ tipo: 'erro', texto: 'Erro na impressora: ' + (e.message || 'Verifique o cabo USB') });
+      setTimeout(() => setToastImpressao(null), 4000);
+    }
+  };
+
+  const handleImprimirEntrega = async (pedido: DeliveryOrder) => {
+    try {
+      const res = await imprimirCupomEntrega({
+        id: pedido.id,
+        numeroPedido: pedido.numeroPedido,
+        tipo: 'delivery',
+        cliente: pedido.clienteNome,
+        telefone: pedido.clienteTelefone,
+        endereco: pedido.endereco,
+        bairro: pedido.bairro,
+        complemento: pedido.complemento,
+        itens: pedido.itens.map((it) => ({
+          nome: it.nome,
+          quantidade: it.quantidade,
+          preco: it.preco,
+          adicionais: it.adicionais,
+        })),
+        total: pedido.total,
+        formaPagamento: pedido.formaPagamento,
+        observacao: pedido.observacoes,
+      });
+      setToastImpressao({ tipo: res.sucesso ? 'ok' : 'erro', texto: res.mensagem });
+      setTimeout(() => setToastImpressao(null), 4000);
+    } catch (e: any) {
+      setToastImpressao({ tipo: 'erro', texto: 'Erro na impressora: ' + (e.message || 'Verifique o cabo USB') });
+      setTimeout(() => setToastImpressao(null), 4000);
+    }
+  };
+
+  const handleTestarImpressora = async () => {
+    try {
+      const res = await testarImpressoraTermica();
+      setToastImpressao({ tipo: res.sucesso ? 'ok' : 'erro', texto: res.mensagem });
+      setTimeout(() => setToastImpressao(null), 5000);
+    } catch (e: any) {
+      setToastImpressao({ tipo: 'erro', texto: 'Erro no teste USB: ' + (e.message || 'Verifique conexão') });
+      setTimeout(() => setToastImpressao(null), 5000);
+    }
+  };
+
+  const handleConectarBluetooth = async () => {
+    try {
+      const res = await conectarImpressoraBluetooth();
+      setToastImpressao({ tipo: res.sucesso ? 'ok' : 'erro', texto: res.mensagem });
+      setTimeout(() => setToastImpressao(null), 5000);
+    } catch (e: any) {
+      setToastImpressao({ tipo: 'erro', texto: 'Erro Bluetooth: ' + (e.message || 'Falha no pareamento') });
+      setTimeout(() => setToastImpressao(null), 5000);
+    }
+  };
+
+  const handleConectarUSB = async () => {
+    try {
+      const res = await conectarImpressoraUSB();
+      setToastImpressao({ tipo: res.sucesso ? 'ok' : 'erro', texto: res.mensagem });
+      setTimeout(() => setToastImpressao(null), 5000);
+    } catch (e: any) {
+      setToastImpressao({ tipo: 'erro', texto: 'Erro USB: ' + (e.message || 'Falha na porta') });
+      setTimeout(() => setToastImpressao(null), 5000);
+    }
+  };
 
   // Referência do watcher para limpar adequadamente
   const idGpsWatcherRef = useRef<number | null>(null);
@@ -158,6 +269,34 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
 
             setPedidos(listaFirestore);
             localStorage.setItem('domgabriel_pedidos_entregador', JSON.stringify(listaFirestore));
+
+            // Auto-impressão automática na cozinha para novos pedidos recebidos via Firebase
+            snapshot.docChanges().forEach((change) => {
+              if (change.type === 'added') {
+                const novoPedido: any = change.doc.data();
+                novoPedido.id = change.doc.id;
+
+                // Se for um pedido novo que acabou de entrar, dispara a impressora automaticamente!
+                if (!primeiraCargaRef.current && (novoPedido.status === 'pendente' || novoPedido.status === 'novo')) {
+                  if (autoPrintCozinhaRef.current) {
+                    imprimirCupomCozinha(novoPedido)
+                      .then((res) => {
+                        if (res?.sucesso) {
+                          setToastImpressao({
+                            tipo: 'ok',
+                            texto: `🖨️ Novo Pedido #${String(novoPedido.numeroPedido || novoPedido.id).slice(-4).toUpperCase()} impresso automaticamente para a chapa! 🍔`,
+                          });
+                          setTimeout(() => setToastImpressao(null), 5000);
+                        }
+                      })
+                      .catch((err) => {
+                        console.error('Erro de comunicação com a impressora térmica:', err);
+                      });
+                  }
+                }
+              }
+            });
+            primeiraCargaRef.current = false;
           } else {
             // Se o Firestore estiver vazio pela primeira vez, alimenta os demos
             PEDIDOS_DEMO_INICIAIS.forEach(async (p) => {
@@ -427,6 +566,52 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
 
           <button
             type="button"
+            onClick={() => {
+              const novo = !autoPrintCozinha;
+              setAutoPrintCozinha(novo);
+              try {
+                localStorage.setItem('domgabriel_autoprint_cozinha', String(novo));
+              } catch {}
+            }}
+            className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              autoPrintCozinha
+                ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/60 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-400'
+            }`}
+            title="Dispara a impressora térmica USB automaticamente quando um novo pedido com status pendente entra no Firebase"
+          >
+            <span className={autoPrintCozinha ? 'animate-pulse' : ''}>⚡</span>
+            <span>Auto-Imprimir:</span>
+            <span
+              className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
+                autoPrintCozinha ? 'bg-emerald-500 text-black' : 'bg-zinc-700 text-zinc-300'
+              }`}
+            >
+              {autoPrintCozinha ? 'LIGADO' : 'DESLIGADO'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleConectarBluetooth}
+            className="px-3 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.2)]"
+            title="Conectar impressora térmica Bluetooth (Celular, Tablet ou sem fio)"
+          >
+            <span>📱 Bluetooth</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleTestarImpressora}
+            className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+            title="Testar impressora térmica USB/Serial (ESC/POS)"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>🖨️ Testar Térmica USB</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleCriarPedidoTeste}
             className="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.2)]"
             title="Adicionar simulação de entrega para testar o fluxo"
@@ -436,6 +621,20 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Alerta / Toast de Impressão Térmica */}
+      {toastImpressao && (
+        <div
+          className={`mb-4 p-3.5 rounded-xl border text-xs font-bold flex items-center gap-2 animate-fadeIn shadow-lg ${
+            toastImpressao.tipo === 'ok'
+              ? 'bg-emerald-950/90 border-emerald-500 text-emerald-300'
+              : 'bg-red-950/90 border-red-500 text-red-300'
+          }`}
+        >
+          <Printer className="w-4 h-4 shrink-0 text-cyan-300" />
+          <span>{toastImpressao.texto}</span>
+        </div>
+      )}
 
       {/* ======================================================== */}
       {/* MODO 1: MONITOR DE DELIVERY & DESPACHO (EXATAMENTE O SNIPPET) */}
@@ -590,6 +789,29 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
                           <strong>Total:</strong> R$ {pedido.total.toFixed(2).replace('.', ',')}
                         </p>
                       )}
+                    </div>
+
+                    {/* Botões de Impressão Térmica ESC/POS (Cozinha & Entrega) */}
+                    <div className="mt-3 pt-2.5 border-t border-[#282a36] flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleImprimirCozinha(pedido)}
+                        className="flex-1 py-1.5 px-2 bg-black hover:bg-zinc-900 border border-amber-500/50 hover:border-amber-400 text-amber-300 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                        title="Imprimir cupom para a chapa/cozinha na impressora térmica USB"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>🖨️ Cupom Cozinha</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleImprimirEntrega(pedido)}
+                        className="flex-1 py-1.5 px-2 bg-black hover:bg-zinc-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                        title="Imprimir cupom de entrega/despacho na impressora térmica USB"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>🛵 Cupom Entrega</span>
+                      </button>
                     </div>
 
                     <div className="pt-2">{botaoAcao}</div>

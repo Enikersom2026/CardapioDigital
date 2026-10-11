@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carrinho & Checkout | Dom Gabriel Hamburgueria</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { background-color: #0f0f12; color: #f4f4f5; }
+    .neon-border { box-shadow: 0 0 15px rgba(34, 211, 238, 0.25); }
+    .neon-glow { text-shadow: 0 0 10px rgba(34, 211, 238, 0.6); }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #22d3ee;
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-16 flex flex-col">
+
+  <!-- TOPO DE NAVEGAÇÃO -->
+  <header class="sticky top-0 z-30 bg-[#141418]/95 backdrop-blur border-b border-zinc-800 px-4 py-3.5">
+    <div class="max-w-3xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/cardapio.html" class="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition-colors flex items-center gap-1.5 text-xs font-bold">
+          ← Cardápio
+        </a>
+        <div>
+          <h1 class="text-base sm:text-lg font-black text-white flex items-center gap-1.5 leading-none">
+            🛒 Seu Carrinho
+          </h1>
+          <p class="text-[11px] text-zinc-400 mt-0.5">Dom Gabriel Hamburgueria Artesanal</p>
+        </div>
+      </div>
+
+      <!-- BADGE MESA QR CODE OU DELIVERY -->
+      <div id="badgeStatusMesa" class="hidden items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/40 rounded-full text-amber-400 text-xs font-extrabold animate-pulse">
+        <span>🪑</span>
+        <span id="txtBadgeMesa">Mesa 01</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main class="max-w-3xl mx-auto w-full px-4 pt-6 flex-1">
+    
+    <!-- BANNER DE AVISO DE MESA (CASO LEU QR CODE) -->
+    <div id="bannerMesaQrCode" class="hidden mb-6 p-4 rounded-2xl bg-gradient-to-r from-amber-950/60 via-zinc-900 to-amber-950/40 border border-amber-500/40 shadow-lg">
+      <div class="flex items-start gap-3">
+        <div class="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl text-xl">🪑</div>
+        <div>
+          <h2 class="text-sm font-black text-amber-300 flex items-center gap-2">
+            Atendimento em Mesa Conectado
+            <span id="labelTagMesa" class="px-2 py-0.5 bg-amber-500 text-black rounded text-[11px] font-black">Mesa 01</span>
+          </h2>
+          <p class="text-xs text-zinc-300 mt-1">
+            Seu pedido será impresso diretamente na cozinha com o identificador da sua mesa. Não é necessário preencher taxa ou endereço de entrega!
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- COLUNA DA ESQUERDA: LISTA DE ITENS DO CARRINHO -->
+      <div class="lg:col-span-7 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-extrabold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+            📦 Itens Selecionados (<span id="contagemItens">0</span>)
+          </h2>
+          <button type="button" onclick="limparCarrinho()" class="text-xs text-red-400 hover:text-red-300 transition-colors">
+            Limpar Sacola
+          </button>
+        </div>
+
+        <!-- CONTAINER DA LISTA -->
+        <div id="listaCarrinho" class="space-y-3">
+          <!-- Renderizado via JavaScript -->
+        </div>
+
+        <!-- MENSAGEM VAZIA -->
+        <div id="carrinhoVazioMsg" class="hidden p-8 text-center bg-zinc-950 rounded-2xl border border-zinc-800 space-y-3">
+          <div class="text-4xl">🍔</div>
+          <p class="text-sm font-bold text-white">Sua sacola está vazia!</p>
+          <p class="text-xs text-zinc-400">Escolha os melhores burgers e acompanhamentos no cardápio.</p>
+          <a href="/cardapio.html" class="inline-block px-5 py-2.5 bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs rounded-xl transition-all shadow-[0_0_15px_rgba(34,211,238,0.4)]">
+            Explorar Cardápio Agora
+          </a>
+        </div>
+
+        <!-- CUPOM DE DESCONTO / OBSERVAÇÕES DOS ITENS -->
+        <div class="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl space-y-2">
+          <label class="block text-xs font-bold text-zinc-300">Observações Gerais para a Cozinha:</label>
+          <textarea id="inputObsPedido" rows="2" placeholder="Ex: Carne ao ponto, sem cebola, maionese à parte..." class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs placeholder-zinc-500"></textarea>
+        </div>
+      </div>
+
+      <!-- COLUNA DA DIREITA: DADOS DO CLIENTE & PAGAMENTO -->
+      <div class="lg:col-span-5 space-y-4">
+        
+        <div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 sm:p-5 space-y-4">
+          <h2 class="text-sm font-extrabold text-white uppercase tracking-wider border-b border-zinc-800 pb-2">
+            👤 Identificação do Pedido
+          </h2>
+
+          <!-- FORMULÁRIO -->
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Seu Nome Completo: <span class="text-red-400">*</span></label>
+              <input type="text" id="inputNomeCliente" placeholder="Ex: João da Silva" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">WhatsApp / Telefone: <span class="text-red-400">*</span></label>
+              <input type="tel" id="inputTelefoneCliente" placeholder="Ex: (11) 99999-8888" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs">
+            </div>
+
+            <!-- OPÇÕES DE MODO (ESCONDIDO SE QR CODE MESA ATIVO) -->
+            <div id="seletorModoAtendimento" class="space-y-1.5 pt-1">
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Modo de Entrega:</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" id="btnModoDelivery" onclick="definirModo('delivery')" class="py-2 px-3 rounded-xl border border-cyan-500 bg-cyan-500/20 text-cyan-300 text-xs font-extrabold transition-all">
+                  🛵 Delivery
+                </button>
+                <button type="button" id="btnModoMesa" onclick="definirModo('mesa')" class="py-2 px-3 rounded-xl border border-zinc-800 bg-zinc-900 text-zinc-400 text-xs font-bold transition-all">
+                  🪑 Mesa
+                </button>
+              </div>
+            </div>
+
+            <!-- SEÇÃO DE ENDEREÇO (SÓ DELIVERY) -->
+            <div id="campoEnderecoDelivery" class="space-y-2 pt-1">
+              <div>
+                <label class="block text-xs font-bold text-zinc-300 mb-1">Endereço de Entrega:</label>
+                <input type="text" id="inputEnderecoDelivery" placeholder="Rua, Número, Bairro" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-zinc-300 mb-1">Complemento / Ponto de Referência:</label>
+                <input type="text" id="inputComplementoDelivery" placeholder="Apto, Bloco, portão branco..." class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs">
+              </div>
+            </div>
+
+            <!-- SEÇÃO DE MESA MANUAL (SE NÃO TIVER QR CODE) -->
+            <div id="campoMesaManual" class="hidden space-y-1 pt-1">
+              <label class="block text-xs font-bold text-amber-300 mb-1">Número da Mesa:</label>
+              <input type="number" id="inputNumeroMesaManual" min="1" max="50" placeholder="Ex: 5" class="w-full px-3 py-2 bg-zinc-900 border border-amber-500/40 rounded-xl text-white text-xs">
+            </div>
+
+            <!-- FORMA DE PAGAMENTO -->
+            <div class="pt-1">
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Forma de Pagamento:</label>
+              <select id="selectPagamento" onchange="alternarCamposPagamento()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs">
+                <option value="pix">PIX Instantâneo</option>
+                <option value="cartao_credito">Cartão de Crédito</option>
+                <option value="cartao_debito">Cartão de Débito</option>
+                <option value="dinheiro">Dinheiro</option>
+              </select>
+            </div>
+
+            <div id="campoTroco" class="hidden">
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Precisa de troco para quanto?</label>
+              <input type="text" id="inputTroco" placeholder="Ex: R$ 50,00" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs">
+            </div>
+          </div>
+
+          <!-- RESUMO FINANCEIRO -->
+          <div class="border-t border-zinc-800 pt-3 space-y-1.5 text-xs">
+            <div class="flex justify-between text-zinc-400">
+              <span>Subtotal dos Itens:</span>
+              <span id="txtSubtotal" class="font-mono text-white font-bold">R$ 0,00</span>
+            </div>
+            <div id="linhaTaxaEntrega" class="flex justify-between text-zinc-400">
+              <span>Taxa de Entrega:</span>
+              <span class="font-mono text-emerald-400 font-bold">Grátis</span>
+            </div>
+            <div class="flex justify-between text-white font-black text-sm pt-2 border-t border-zinc-800/80">
+              <span>Total Geral:</span>
+              <span id="txtTotal" class="font-mono text-cyan-400 font-extrabold text-base">R$ 0,00</span>
+            </div>
+          </div>
+
+          <!-- BOTÃO PRINCIPAL DE DISPARO DO PEDIDO -->
+          <button type="button" id="btnEnviarPedido" onclick="enviarPedidoFirebase()" class="w-full py-3.5 bg-gradient-to-r from-cyan-400 via-teal-400 to-cyan-400 hover:from-cyan-300 hover:to-teal-300 text-black font-black text-sm rounded-xl transition-all shadow-[0_0_20px_rgba(34,211,238,0.5)] cursor-pointer flex items-center justify-center gap-2">
+            <span>🔥</span> Enviar Pedido para Cozinha
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- MODAL DE SUCESSO -->
+  <div id="modalSucesso" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-zinc-950 border border-cyan-500/40 rounded-2xl p-6 max-w-sm w-full text-center space-y-4 shadow-[0_0_30px_rgba(34,211,238,0.3)]">
+      <div class="w-16 h-16 bg-cyan-400/20 text-cyan-400 rounded-full flex items-center justify-center text-3xl mx-auto border border-cyan-400/50">
+        ✅
+      </div>
+      <h3 class="text-lg font-black text-white">Pedido Enviado com Sucesso!</h3>
+      <p id="msgSucessoDetalhe" class="text-xs text-zinc-300 leading-relaxed">
+        Seu pedido foi registrado no sistema e já está sendo preparado pela chapa.
+      </p>
+      <div class="pt-2 flex flex-col gap-2">
+        <a href="/cardapio.html" class="w-full py-2.5 bg-cyan-400 text-black font-extrabold text-xs rounded-xl">
+          Voltar ao Cardápio
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIREBASE SCRIPTS -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // Firebase Configuração
+    const firebaseConfig = {
+      apiKey: "AIzaSyDummyKeyForOlaClickFront123456789",
+      authDomain: "domgabriel-burgers.firebaseapp.com",
+      projectId: "domgabriel-burgers",
+      storageBucket: "domgabriel-burgers.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef123456"
+    };
+
+    let db = null;
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+    } catch (e) {
+      console.warn("Firebase operando em modo offline / fallback local:", e);
+    }
+
+    // ESTADO DO CARRINHO
+    let itensCarrinho = [];
+    let modoAtual = 'delivery';
+
+    // VERIFICA SE O CLIENTE ACESSOU COM QR CODE DE MESA
+    document.addEventListener("DOMContentLoaded", () => {
+      // 1. Tenta pegar da URL se veio como ?mesa=5
+      const urlParams = new URLSearchParams(window.location.search);
+      const mesaUrl = urlParams.get('mesa');
+      if (mesaUrl) {
+        localStorage.setItem('numeroMesaFixoDoQrCode', mesaUrl);
+        localStorage.setItem('modoPedido', 'mesa');
+      }
+
+      // 2. Verifica se existe mesa salva
+      const mesaSalva = localStorage.getItem('numeroMesaFixoDoQrCode');
+      if (mesaSalva) {
+        modoAtual = 'mesa';
+        configurarInterfaceMesa(mesaSalva);
+      } else {
+        const modoGuardado = localStorage.getItem('modoPedido') || 'delivery';
+        definirModo(modoGuardado);
+      }
+
+      carregarCarrinho();
+    });
+
+    function configurarInterfaceMesa(numeroMesa) {
+      const banner = document.getElementById('bannerMesaQrCode');
+      const badge = document.getElementById('badgeStatusMesa');
+      const txtBadge = document.getElementById('txtBadgeMesa');
+      const labelTag = document.getElementById('labelTagMesa');
+      const seletor = document.getElementById('seletorModoAtendimento');
+      const campoEndereco = document.getElementById('campoEnderecoDelivery');
+      const campoMesaManual = document.getElementById('campoMesaManual');
+      const linhaTaxa = document.getElementById('linhaTaxaEntrega');
+
+      const formatada = String(numeroMesa).padStart(2, '0');
+
+      if (banner) banner.classList.remove('hidden');
+      if (badge) {
+        badge.classList.remove('hidden');
+        badge.classList.add('flex');
+      }
+      if (txtBadge) txtBadge.innerText = `Mesa ${formatada}`;
+      if (labelTag) labelTag.innerText = `Mesa ${formatada}`;
+      if (seletor) seletor.classList.add('hidden');
+      if (campoEndereco) campoEndereco.classList.add('hidden');
+      if (campoMesaManual) campoMesaManual.classList.add('hidden');
+      if (linhaTaxa) linhaTaxa.classList.add('hidden');
+    }
+
+    window.definirModo = function(modo) {
+      modoAtual = modo;
+      const btnDelivery = document.getElementById('btnModoDelivery');
+      const btnMesa = document.getElementById('btnModoMesa');
+      const campoEndereco = document.getElementById('campoEnderecoDelivery');
+      const campoMesaManual = document.getElementById('campoMesaManual');
+      const linhaTaxa = document.getElementById('linhaTaxaEntrega');
+
+      if (modo === 'mesa') {
+        if (btnMesa) {
+          btnMesa.className = "py-2 px-3 rounded-xl border border-amber-500 bg-amber-500/20 text-amber-300 text-xs font-extrabold transition-all";
+        }
+        if (btnDelivery) {
+          btnDelivery.className = "py-2 px-3 rounded-xl border border-zinc-800 bg-zinc-900 text-zinc-400 text-xs font-bold transition-all";
+        }
+        if (campoEndereco) campoEndereco.classList.add('hidden');
+        if (campoMesaManual) campoMesaManual.classList.remove('hidden');
+        if (linhaTaxa) linhaTaxa.classList.add('hidden');
+      } else {
+        if (btnDelivery) {
+          btnDelivery.className = "py-2 px-3 rounded-xl border border-cyan-500 bg-cyan-500/20 text-cyan-300 text-xs font-extrabold transition-all";
+        }
+        if (btnMesa) {
+          btnMesa.className = "py-2 px-3 rounded-xl border border-zinc-800 bg-zinc-900 text-zinc-400 text-xs font-bold transition-all";
+        }
+        if (campoEndereco) campoEndereco.classList.remove('hidden');
+        if (campoMesaManual) campoMesaManual.classList.add('hidden');
+        if (linhaTaxa) linhaTaxa.classList.remove('hidden');
+      }
+    };
+
+    window.alternarCamposPagamento = function() {
+      const select = document.getElementById('selectPagamento');
+      const campoTroco = document.getElementById('campoTroco');
+      if (select && campoTroco) {
+        if (select.value === 'dinheiro') {
+          campoTroco.classList.remove('hidden');
+        } else {
+          campoTroco.classList.add('hidden');
+        }
+      }
+    };
+
+    function carregarCarrinho() {
+      try {
+        const sacolaStr = localStorage.getItem('dom_gabriel_sacola') || localStorage.getItem('carrinho_dom_gabriel');
+        if (sacolaStr) {
+          itensCarrinho = JSON.parse(sacolaStr);
+        } else {
+          itensCarrinho = [];
+        }
+      } catch (e) {
+        itensCarrinho = [];
+      }
+
+      renderizarItens();
+    }
+
+    function salvarCarrinho() {
+      localStorage.setItem('dom_gabriel_sacola', JSON.stringify(itensCarrinho));
+      localStorage.setItem('carrinho_dom_gabriel', JSON.stringify(itensCarrinho));
+      renderizarItens();
+    }
+
+    function renderizarItens() {
+      const container = document.getElementById('listaCarrinho');
+      const msgVazio = document.getElementById('carrinhoVazioMsg');
+      const contagem = document.getElementById('contagemItens');
+      const txtSubtotal = document.getElementById('txtSubtotal');
+      const txtTotal = document.getElementById('txtTotal');
+
+      const totalQtd = itensCarrinho.reduce((acc, it) => acc + (it.quantidade || it.quantity || 1), 0);
+      const subtotal = itensCarrinho.reduce((acc, it) => {
+        const preco = it.preco || it.price || 0;
+        const qtd = it.quantidade || it.quantity || 1;
+        return acc + (preco * qtd);
+      }, 0);
+
+      if (contagem) contagem.innerText = totalQtd;
+      if (txtSubtotal) txtSubtotal.innerText = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
+      if (txtTotal) txtTotal.innerText = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
+
+      if (itensCarrinho.length === 0) {
+        if (container) container.innerHTML = '';
+        if (msgVazio) msgVazio.classList.remove('hidden');
+        return;
+      }
+
+      if (msgVazio) msgVazio.classList.add('hidden');
+
+      if (container) {
+        container.innerHTML = itensCarrinho.map((item, index) => {
+          const nome = item.nome || item.name || 'Hambúrguer Artesanal';
+          const preco = item.preco || item.price || 0;
+          const qtd = item.quantidade || item.quantity || 1;
+          const totalItem = preco * qtd;
+
+          return `
+            <div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
+              <div class="flex-1 min-w-0">
+                <h4 class="text-xs sm:text-sm font-extrabold text-white truncate">${nome}</h4>
+                <p class="text-[11px] text-zinc-400 font-mono mt-0.5">${qtd}x R$ ${preco.toFixed(2).replace('.', ',')}</p>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <span class="text-xs sm:text-sm font-black text-cyan-400 font-mono">
+                  R$ ${totalItem.toFixed(2).replace('.', ',')}
+                </span>
+
+                <div class="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-2 py-1">
+                  <button type="button" onclick="alterarQuantidade(${index}, -1)" class="w-5 h-5 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center text-xs font-bold transition-colors">
+                    -
+                  </button>
+                  <span class="text-xs font-bold text-white font-mono px-1">${qtd}</span>
+                  <button type="button" onclick="alterarQuantidade(${index}, 1)" class="w-5 h-5 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center text-xs font-bold transition-colors">
+                    +
+                  </button>
+                </div>
+
+                <button type="button" onclick="removerItem(${index})" class="text-zinc-500 hover:text-red-400 transition-colors p-1" title="Remover item">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    window.alterarQuantidade = function(index, delta) {
+      if (!itensCarrinho[index]) return;
+      const item = itensCarrinho[index];
+      const qtdAtual = item.quantidade || item.quantity || 1;
+      const novaQtd = qtdAtual + delta;
+
+      if (novaQtd <= 0) {
+        itensCarrinho.splice(index, 1);
+      } else {
+        item.quantidade = novaQtd;
+        item.quantity = novaQtd;
+      }
+      salvarCarrinho();
+    };
+
+    window.removerItem = function(index) {
+      itensCarrinho.splice(index, 1);
+      salvarCarrinho();
+    };
+
+    window.limparCarrinho = function() {
+      if (itensCarrinho.length === 0) return;
+      if (confirm('Tem certeza que deseja esvaziar o carrinho?')) {
+        itensCarrinho = [];
+        salvarCarrinho();
+      }
+    };
+
+    // ==========================================
+    // 🚀 ENVIO DO PEDIDO PARA O FIREBASE
+    // ==========================================
+    window.enviarPedidoFirebase = async function() {
+      if (itensCarrinho.length === 0) {
+        alert("Sua sacola está vazia! Adicione itens pelo cardápio antes de enviar.");
+        return;
+      }
+
+      const inputNome = document.getElementById('inputNomeCliente');
+      const inputTel = document.getElementById('inputTelefoneCliente');
+      const nome = inputNome ? inputNome.value.trim() : '';
+      const telefone = inputTel ? inputTel.value.trim() : '';
+
+      if (!nome) {
+        alert("Por favor, preencha o seu Nome Completo.");
+        if (inputNome) inputNome.focus();
+        return;
+      }
+
+      if (!telefone) {
+        alert("Por favor, informe seu WhatsApp para receber atualizações do pedido.");
+        if (inputTel) inputTel.focus();
+        return;
+      }
+
+      const formaPagamento = document.getElementById('selectPagamento')?.value || 'pix';
+      const observacoes = document.getElementById('inputObsPedido')?.value.trim() || '';
+      const troco = document.getElementById('inputTroco')?.value.trim() || '';
+
+      const endereco = document.getElementById('inputEnderecoDelivery')?.value.trim() || '';
+      const complemento = document.getElementById('inputComplementoDelivery')?.value.trim() || '';
+      const mesaManual = document.getElementById('inputNumeroMesaManual')?.value.trim() || '';
+
+      const subtotal = itensCarrinho.reduce((acc, it) => {
+        const preco = it.preco || it.price || 0;
+        const qtd = it.quantidade || it.quantity || 1;
+        return acc + (preco * qtd);
+      }, 0);
+
+      const itensFormatados = itensCarrinho.map(it => {
+        const qtd = it.quantidade || it.quantity || 1;
+        const n = it.nome || it.name || 'Item';
+        return `${qtd}x ${n}`;
+      });
+
+      // MONTAGEM DO OBJETO DE PEDIDO
+      const pedido = {
+        cliente: nome,
+        clienteNome: nome,
+        telefone: telefone,
+        tipo: modoAtual === 'mesa' ? 'mesa' : 'delivery',
+        endereco: modoAtual === 'delivery' ? (complemento ? `${endereco} (${complemento})` : endereco) : 'Consumo no Salão',
+        itens: itensFormatados,
+        total: subtotal,
+        subtotal: subtotal,
+        formaPagamento: formaPagamento,
+        troco: troco || null,
+        observacoes: observacoes,
+        status: 'pendente', // O status 'pendente' dispara a impressora térmica na cozinha!
+        criadoEm: new Date().toISOString()
+      };
+
+      // --- INJEÇÃO DA MESA (CAPTURA PELO QR CODE) ---
+      const mesaDoQrCode = localStorage.getItem('numeroMesaFixoDoQrCode');
+      if (mesaDoQrCode) {
+          // Injeta o número capturado no objeto que vai para a cozinha!
+          pedido.mesa = mesaDoQrCode;
+          pedido.numeroMesa = mesaDoQrCode;
+          pedido.tipo = 'mesa';
+          pedido.endereco = `Consumo no Salão - Mesa ${mesaDoQrCode}`;
+      } else if (modoAtual === 'mesa') {
+          pedido.mesa = mesaManual || '01';
+          pedido.numeroMesa = mesaManual || '01';
+          pedido.endereco = `Consumo no Salão - Mesa ${pedido.mesa}`;
+      }
+
+      const btn = document.getElementById('btnEnviarPedido');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span>⏳</span> Enviando Pedido...`;
+      }
+
+      try {
+        if (db) {
+          await addDoc(collection(db, "pedidos"), pedido);
+        }
+
+        // Salva backup local
+        const listaLocal = JSON.parse(localStorage.getItem('pedidos_dom_gabriel') || '[]');
+        listaLocal.push({ id: `ped-${Date.now()}`, ...pedido });
+        localStorage.setItem('pedidos_dom_gabriel', JSON.stringify(listaLocal));
+
+        // Limpa o carrinho
+        itensCarrinho = [];
+        salvarCarrinho();
+
+        // Exibe modal de confirmação
+        const modal = document.getElementById('modalSucesso');
+        const detalhe = document.getElementById('msgSucessoDetalhe');
+        if (detalhe) {
+          detalhe.innerHTML = `
+            Seu pedido no valor de <strong>R$ ${subtotal.toFixed(2).replace('.', ',')}</strong> foi recebido com sucesso!<br>
+            ${pedido.mesa ? `<span class="text-amber-400 font-bold">🪑 Mesa: ${pedido.mesa}</span>` : '<span class="text-cyan-400 font-bold">🛵 Delivery</span>'}<br>
+            A chapa já está acesa e preparando seus hambúrgueres!
+          `;
+        }
+        if (modal) modal.classList.remove('hidden');
+
+      } catch (err) {
+        console.error("Erro ao enviar pedido:", err);
+        alert("Ocorreu um erro ao enviar o pedido para o servidor. Tente novamente.");
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<span>🔥</span> Enviar Pedido para Cozinha`;
+        }
+      }
+    };
+  </script>
+
+</body>
+</html>

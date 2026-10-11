@@ -200,12 +200,42 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
   const [modoAtendimento, setModoAtendimento] = useState<'delivery' | 'mesa'>(() => {
     return (localStorage.getItem('modoPedido') as 'delivery' | 'mesa') || 'delivery';
   });
-  const [numeroMesa, setNumeroMesa] = useState('Mesa 01');
+  const [numeroMesa, setNumeroMesa] = useState(() => {
+    const salvo = localStorage.getItem('numeroMesaFixoDoQrCode');
+    return salvo ? `Mesa ${String(salvo).padStart(2, '0')}` : 'Mesa 01';
+  });
+  const [mesaFixoQrCode, setMesaFixoQrCode] = useState<string | null>(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('mesa') || localStorage.getItem('numeroMesaFixoDoQrCode');
+    } catch {
+      return null;
+    }
+  });
 
-  const trocarModoOla = (modo: 'delivery' | 'mesa') => {
+  const trocarModoOla = useCallback((modo: 'delivery' | 'mesa') => {
     setModoAtendimento(modo);
     localStorage.setItem('modoPedido', modo);
-  };
+  }, []);
+
+  // Exposição global de trocarModoOla e detecção de QR Code da Mesa
+  useEffect(() => {
+    (window as any).trocarModoOla = trocarModoOla;
+
+    // --- ENGENHARIA DE LEITURA DE QR CODE ---
+    const parametrosUrl = new URLSearchParams(window.location.search);
+    const numeroMesaQr = parametrosUrl.get('mesa');
+
+    if (numeroMesaQr) {
+      console.log(`Cliente escaneou o QR Code da Mesa: ${numeroMesaQr}`);
+      localStorage.setItem('modoPedido', 'mesa');
+      trocarModoOla('mesa');
+      const numFmt = `Mesa ${String(numeroMesaQr).padStart(2, '0')}`;
+      setNumeroMesa(numFmt);
+      setMesaFixoQrCode(numeroMesaQr);
+      localStorage.setItem('numeroMesaFixoDoQrCode', numeroMesaQr);
+    }
+  }, [trocarModoOla]);
 
   // 3. Categorias e Busca
   const [categoriaAtiva, setCategoriaAtiva] = useState('Todos');
@@ -255,14 +285,23 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
     try {
       localStorage.setItem('meuCarrinho_detalhado', JSON.stringify(carrinho));
       const flatList: Array<{ nome: string; preco: number }> = [];
+      const sacolaHtml: Array<{ id: string; nome: string; preco: number; quantidade: number }> = [];
       carrinho.forEach((item) => {
         const addonsTotal = (item.selectedAddons || []).reduce((s, a) => s + a.price, 0);
         const unitTotal = item.dish.price + addonsTotal;
         for (let i = 0; i < item.quantity; i++) {
           flatList.push({ nome: item.dish.name, preco: unitTotal });
         }
+        sacolaHtml.push({
+          id: item.dish.id,
+          nome: item.dish.name,
+          preco: unitTotal,
+          quantidade: item.quantity,
+        });
       });
       localStorage.setItem('meuCarrinho', JSON.stringify(flatList));
+      localStorage.setItem('dom_gabriel_sacola', JSON.stringify(sacolaHtml));
+      localStorage.setItem('carrinho_dom_gabriel', JSON.stringify(sacolaHtml));
     } catch (err) {
       console.error(err);
     }
@@ -633,6 +672,15 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
       criadoEm: new Date().toISOString(),
     };
 
+    const mesaDoQrCode = localStorage.getItem('numeroMesaFixoDoQrCode');
+    if (mesaDoQrCode) {
+      // Injeta o número capturado no objeto que vai para a cozinha!
+      novoPedidoParaEntregador.mesa = mesaDoQrCode;
+      (novoPedidoParaEntregador as any).numeroMesa = mesaDoQrCode;
+      (novoPedidoParaEntregador as any).tipo = 'mesa';
+      novoPedidoParaEntregador.endereco = `Consumo no Salão - Mesa ${mesaDoQrCode}`;
+    }
+
     try {
       setDoc(doc(db, 'pedidos', novoPedidoParaEntregador.id), novoPedidoParaEntregador);
       const salvos = localStorage.getItem('domgabriel_pedidos_entregador');
@@ -962,7 +1010,7 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
 
           <div className="flex-1 text-left min-w-0">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight font-display break-words">
-              {restaurant.name}
+              {mesaFixoQrCode ? `Dom Gabriel | Mesa ${String(mesaFixoQrCode).padStart(2, '0')} 🪑` : restaurant.name}
             </h1>
             <p className="text-xs sm:text-sm text-zinc-400 mt-1 leading-relaxed break-words">
               {restaurant.tagline}
@@ -1068,8 +1116,11 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
         {/* 4. Barra de Ações: Modo de Atendimento + Busca Rápida */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 mb-6">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
-            {/* Seleção Delivery vs Mesa */}
-            <div className="wrapper-modo flex bg-zinc-950 p-1.5 rounded-xl border border-cyan-500/40 shadow-[0_0_18px_rgba(6,182,212,0.2)] min-w-[280px]">
+            {/* Seleção Delivery vs Mesa (escondido se leu QR Code de mesa física) */}
+            <div
+              className="wrapper-modo flex bg-zinc-950 p-1.5 rounded-xl border border-cyan-500/40 shadow-[0_0_18px_rgba(6,182,212,0.2)] min-w-[280px]"
+              style={{ display: mesaFixoQrCode ? 'none' : 'flex' }}
+            >
               <button
                 id="btnDeliv"
                 onClick={() => trocarModoOla('delivery')}
@@ -1097,8 +1148,16 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
               </button>
             </div>
 
-            {/* Seletor de Mesa se estiver em modo mesa */}
-            {modoAtendimento === 'mesa' && (
+            {/* Indicador de Mesa Fixa por QR Code */}
+            {mesaFixoQrCode && (
+              <div className="p-2.5 px-3.5 bg-amber-500/15 border border-amber-500/50 rounded-xl flex items-center gap-2 text-xs text-amber-300 font-bold shadow-[0_0_14px_rgba(245,158,11,0.25)]">
+                <span>🪑 Atendimento Fixo no Salão:</span>
+                <span className="font-mono underline uppercase tracking-wider text-white">Mesa {String(mesaFixoQrCode).padStart(2, '0')}</span>
+              </div>
+            )}
+
+            {/* Seletor de Mesa se estiver em modo mesa e NÃO for QR Code fixo */}
+            {modoAtendimento === 'mesa' && !mesaFixoQrCode && (
               <div className="p-2 bg-zinc-950 rounded-xl border border-cyan-500/30 flex items-center gap-2 text-xs">
                 <span className="font-bold text-cyan-400 font-mono text-[11px] whitespace-nowrap">Mesa:</span>
                 <select

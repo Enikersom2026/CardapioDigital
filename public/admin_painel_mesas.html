@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Mesas Premium | Dom Gabriel Hamburgueria</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #0f0f12; color: white; padding: 20px; }
+        
+        header { border-bottom: 1px solid #29292e; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        header h1 { font-size: 22px; color: #ffb86c; display: flex; align-items: center; gap: 8px; }
+        
+        .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .btn-header { background: #29292e; color: white; border: 1px solid #3e3e46; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-header:hover { background: #383842; border-color: #ffb86c; }
+
+        .legenda-container { display: flex; gap: 15px; margin: 0 auto 20px auto; max-width: 800px; justify-content: center; flex-wrap: wrap; font-size: 12px; }
+        .legenda-item { display: flex; align-items: center; gap: 6px; }
+        .legenda-dot { width: 12px; height: 12px; border-radius: 4px; }
+        
+        /* Grid de Quadradinhos Dinâmicos */
+        .grid-mesas-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap: 15px; max-width: 800px; margin: 0 auto; }
+        .mesa-quadrada { height: 85px; border-radius: 14px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; cursor: pointer; transition: 0.2s; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .mesa-quadrada:hover { transform: translateY(-3px) scale(1.05); box-shadow: 0 8px 20px rgba(0,0,0,0.5); }
+        
+        /* Cores de Status */
+        .status-livre { background-color: #00b37e; color: white; }      /* Verde */
+        .status-ocupada { background-color: #ff9f1c; color: white; }    /* Laranja */
+        .status-pendente { background-color: #dc3545; color: white; }   /* Vermelho */
+        
+        .mesa-numero { font-size: 20px; font-weight: 900; }
+        .mesa-status-txt { font-size: 10px; opacity: 0.9; margin-top: 2px; letter-spacing: 0.5px; font-weight: 800; }
+        .mesa-total-txt { font-size: 9px; opacity: 0.95; margin-top: 2px; font-family: monospace; }
+
+        /* Modal Flutuante para Lançamentos */
+        .modal-background { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-lançamento { background: #1a1a1e; border: 1px solid #29292e; border-radius: 16px; padding: 25px; width: 92%; max-width: 480px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #29292e; padding-bottom: 12px; }
+        .modal-header h2 { font-size: 18px; color: #fff; }
+        
+        label { display: block; font-size: 13px; color: #c4c4cc; margin-top: 15px; margin-bottom: 6px; font-weight: 600; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #29292e; background: #202024; color: white; border-radius: 8px; font-size: 14px; }
+        input:focus, select:focus { outline: none; border-color: #ffb86c; }
+        
+        .btn-modal { width: 100%; padding: 13px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 13px; transition: 0.2s; }
+        .btn-lancar { background: #ff4b2b; color: white; box-shadow: 0 4px 14px rgba(255,75,43,0.3); }
+        .btn-lancar:hover { background: #e03f21; }
+        .btn-fechar-conta { background: transparent; border: 1px solid #00b37e; color: #00b37e; }
+        .btn-fechar-conta:hover { background: rgba(0, 179, 126, 0.15); }
+
+        .consumo-box { background: #202024; padding: 14px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #29292e; }
+        .consumo-total { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #3e3e46; font-size: 13px; font-weight: bold; color: #00b37e; display: flex; justify-content: space-between; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🍽️ Painel de Salão Visual <span style="font-size: 12px; color: #8d8d99; font-weight: normal;">• Dom Gabriel</span></h1>
+        <div class="header-actions">
+            <a href="/" class="btn-header">⬅️ Voltar ao App</a>
+            <button class="btn-header" onclick="configurarQuantidadeMesas()">⚙️ Definir Qtd de Mesas</button>
+        </div>
+    </header>
+
+    <!-- Legenda de cores -->
+    <div class="legenda-container">
+        <div class="legenda-item"><span class="legenda-dot" style="background:#00b37e;"></span><span>Livre (Verde)</span></div>
+        <div class="legenda-item"><span class="legenda-dot" style="background:#ff9f1c;"></span><span>Ocupada (Laranja)</span></div>
+        <div class="legenda-item"><span class="legenda-dot" style="background:#dc3545;"></span><span>Pendente / Chapa (Vermelho)</span></div>
+    </div>
+
+    <!-- O Grid dinâmico baseado no seu print entra aqui -->
+    <main class="grid-mesas-container" id="gridMesas">
+        <!-- Renderizado dinamicamente via JS -->
+    </main>
+
+    <!-- INTERFACE DA MINI TELA DE LANÇAMENTO -->
+    <div class="modal-background" id="modalLigarMesa">
+        <div class="modal-lançamento">
+            <div class="modal-header">
+                <h2 id="txtTituloMesa">Comanda da Mesa 00</h2>
+                <button onclick="fecharModalMesa()" style="background:none; border:none; color:#ff4b2b; font-size:26px; cursor:pointer; line-height: 1;">&times;</button>
+            </div>
+            
+            <div id="infoMesaOcupada" class="consumo-box" style="display: none;">
+                <strong style="color: #ff9f1c; font-size: 13px; display: block; margin-bottom: 6px;">📋 Itens já consumidos:</strong>
+                <p id="listaConsumoMesa" style="font-size: 13px; color: #e1e1e6; line-height: 1.6;"></p>
+                <div class="consumo-total">
+                    <span>Subtotal Consumido:</span>
+                    <span id="valorTotalConsumoMesa">R$ 0,00</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="nomeClienteMesa">Nome do Cliente na Mesa:</label>
+                <input type="text" id="nomeClienteMesa" placeholder="Ex: Roberto Alencar">
+            </div>
+
+            <div class="form-group">
+                <label for="selectProdutoMesa">Selecione o Hambúrguer / Produto:</label>
+                <select id="selectProdutoMesa">
+                    <!-- Carregado do Estoque automaticamente -->
+                </select>
+            </div>
+
+            <button class="btn-modal btn-lancar" onclick="dispararPedidoParaCozinha()">🔥 Lançar e Imprimir na Cozinha</button>
+            <button class="btn-modal" id="btnVerCardapioMesa" style="background:#202024; border:1px solid #3e3e46; color:#22d3ee;" onclick="abrirCardapioMesa()">📱 Abrir / Ver Cardápio Desta Mesa (QR Code)</button>
+            <button class="btn-modal btn-fechar-conta" id="btnLiberarMesa" style="display: none;" onclick="concluirPagamentoMesa()">💳 Fechar Conta e Liberar Mesa</button>
+        </div>
+    </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // Credenciais reais integradas do Firebase do Dom Gabriel
+    const firebaseConfig = {
+      apiKey: "AIzaSyDa9q1d-example",
+      authDomain: "domgabriel-hamburgueria.firebaseapp.com",
+      projectId: "domgabriel-hamburgueria",
+      storageBucket: "domgabriel-hamburgueria.appspot.com",
+      messagingSenderId: "560080093081",
+      appId: "1:560080093081:web:fac59c4fa4b392657c1d08"
+    };
+
+    let app;
+    let db;
+    try {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+    } catch (e) {
+        console.warn("Firebase init fallback:", e);
+    }
+
+    let mesaSelecionadaNum = null;
+    let documentoMesaIdAtual = null;
+    let pedidosNoSalao = {};
+
+    // Cardápio padrão caso o banco demore para responder
+    const cardapioPadrao = [
+        { nome: "Dom Gabriel Especial 180g", preco: 38.90 },
+        { nome: "Smash Burger Duplo 4Zero5", preco: 32.90 },
+        { nome: "X-Bacon Supremo Dom Gabriel", preco: 34.90 },
+        { nome: "Batata Rústica com Alecrim", preco: 18.00 },
+        { nome: "Onion Rings Crocantes", preco: 22.00 },
+        { nome: "Coca-Cola Lata 350ml", preco: 6.50 },
+        { nome: "Cerveja Heineken Long Neck", preco: 12.00 }
+    ];
+
+    function popularSelectCardapio(itens) {
+        const select = document.getElementById('selectProdutoMesa');
+        if (!select) return;
+        select.innerHTML = '';
+        itens.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = `${p.nome}|${p.preco}`;
+            opt.textContent = `${p.nome} - R$ ${Number(p.preco).toFixed(2).replace('.', ',')}`;
+            select.appendChild(opt);
+        });
+    }
+    popularSelectCardapio(cardapioPadrao);
+
+    // 1. Monitora os pedidos ativos nas mesas pelo Firebase para colorir o grid
+    if (db) {
+        try {
+            onSnapshot(collection(db, "pedidos"), (snapshot) => {
+                pedidosNoSalao = {};
+                snapshot.forEach(docSnap => {
+                    const ped = docSnap.data();
+                    if(ped.tipo === 'mesa' && ped.status !== 'finalizado_local' && ped.status !== 'paga' && ped.status !== 'entregue') {
+                        pedidosNoSalao[ped.mesa] = { id: docSnap.id, ...ped };
+                    }
+                });
+                renderizarGridDeMesas();
+            });
+
+            // Carrega a lista de produtos no select para o garçom escolher
+            onSnapshot(collection(db, "pratos"), (snapshot) => {
+                if (!snapshot.empty) {
+                    const lista = [];
+                    snapshot.forEach(docSnap => {
+                        const p = docSnap.data();
+                        lista.push({ nome: p.nome || p.name, preco: Number(p.preco || p.price || 0) });
+                    });
+                    if (lista.length > 0) popularSelectCardapio(lista);
+                }
+            });
+        } catch (err) {
+            console.error("Erro listeners Firebase:", err);
+        }
+    }
+
+    // Carrega também do localStorage do app principal caso disponível
+    try {
+        const menuStorage = localStorage.getItem('cardapio_studio_items') || localStorage.getItem('meuCardapio');
+        if (menuStorage) {
+            const parsed = JSON.parse(menuStorage);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                popularSelectCardapio(parsed.map(i => ({ nome: i.name || i.nome, preco: Number(i.price || i.preco || 0) })));
+            }
+        }
+    } catch {}
+
+    // Configura a quantidade de mesas
+    window.configurarQuantidadeMesas = function() {
+        const atual = parseInt(localStorage.getItem('totalMesasLayout')) || 15;
+        const novo = prompt("Quantas mesas seu salão possui?", atual);
+        if (novo && !isNaN(novo) && parseInt(novo) > 0) {
+            localStorage.setItem('totalMesasLayout', parseInt(novo));
+            renderizarGridDeMesas();
+        }
+    };
+
+    // 2. Monta o Grid de Quadradinhos igual ao da sua imagem
+    function renderizarGridDeMesas() {
+        const totalMesas = parseInt(localStorage.getItem('totalMesasLayout')) || 15;
+        const grid = document.getElementById('gridMesas');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+        for (let i = 1; i <= totalMesas; i++) {
+            let status = 'livre';
+            let classeCor = 'status-livre';
+            let totalTexto = '';
+            
+            if (pedidosNoSalao[i]) {
+                status = pedidosNoSalao[i].status === 'pendente' ? 'pendente' : 'ocupada';
+                classeCor = status === 'pendente' ? 'status-pendente' : 'status-ocupada';
+                if (pedidosNoSalao[i].total) {
+                    totalTexto = `R$ ${Number(pedidosNoSalao[i].total).toFixed(2).replace('.', ',')}`;
+                }
+            }
+
+            const card = document.createElement('div');
+            card.className = `mesa-quadrada ${classeCor}`;
+            card.onclick = () => window.abrirPainelLançamento(i);
+            card.innerHTML = `
+                <span class="mesa-numero">${String(i).padStart(2, '0')}</span>
+                <span class="mesa-status-txt">${status.toUpperCase()}</span>
+                ${totalTexto ? `<span class="mesa-total-txt">${totalTexto}</span>` : ''}
+            `;
+            grid.appendChild(card);
+        }
+    }
+    renderizarGridDeMesas();
+
+    // 3. Abre a mini tela de lançamento ao clicar na mesa
+    window.abrirPainelLançamento = function(numeroMesa) {
+        mesaSelecionadaNum = numeroMesa;
+        document.getElementById('txtTituloMesa').innerText = `Comanda da Mesa ${String(numeroMesa).padStart(2, '0')}`;
+        
+        const pedidoExistente = pedidosNoSalao[numeroMesa];
+        const infoOcupada = document.getElementById('infoMesaOcupada');
+        const btnLiberar = document.getElementById('btnLiberarMesa');
+
+        if (pedidoExistente) {
+            documentoMesaIdAtual = pedidoExistente.id;
+            document.getElementById('nomeClienteMesa').value = pedidoExistente.cliente || pedidoExistente.clienteNome || '';
+            const itensLista = Array.isArray(pedidoExistente.itens) ? pedidoExistente.itens : [];
+            const itensTexto = itensLista.map(it => {
+                if (typeof it === 'string') return `• ${it}`;
+                if (it && typeof it === 'object') return `• ${it.quantidade || 1}x ${it.nome || 'Item'}`;
+                return `• ${it}`;
+            }).join('<br>');
+            
+            document.getElementById('listaConsumoMesa').innerHTML = itensTexto || 'Nenhum item lançado.';
+            document.getElementById('valorTotalConsumoMesa').innerText = `R$ ${(Number(pedidoExistente.total) || 0).toFixed(2).replace('.', ',')}`;
+            infoOcupada.style.display = "block";
+            btnLiberar.style.display = "block";
+        } else {
+            documentoMesaIdAtual = null;
+            document.getElementById('nomeClienteMesa').value = '';
+            infoOcupada.style.display = "none";
+            btnLiberar.style.display = "none";
+        }
+
+        document.getElementById('modalLigarMesa').style.display = 'flex';
+    };
+
+    window.fecharModalMesa = function() {
+        document.getElementById('modalLigarMesa').style.display = 'none';
+    };
+
+    // 4. Lança o Hambúrguer e joga na esteira automática para a impressora ler
+    window.dispararPedidoParaCozinha = async function() {
+        const nomeCliente = document.getElementById('nomeClienteMesa').value || `Mesa ${mesaSelecionadaNum}`;
+        const prodSelecionado = document.getElementById('selectProdutoMesa').value;
+        
+        if(!prodSelecionado) { alert("Nenhum hambúrguer cadastrado no sistema!"); return; }
+        
+        const [nomeItem, precoItemStr] = prodSelecionado.split('|');
+        const precoItem = parseFloat(precoItemStr) || 0;
+
+        try {
+            if (documentoMesaIdAtual) {
+                // Se a mesa já está aberta, adiciona o novo lanche à lista existente
+                const pedAtual = pedidosNoSalao[mesaSelecionadaNum];
+                const itensAntigos = Array.isArray(pedAtual.itens) ? pedAtual.itens : [];
+                const itensAtualizados = [...itensAntigos, `1x ${nomeItem}`];
+                const novoTotal = (Number(pedAtual.total) || 0) + precoItem;
+
+                if (db) {
+                    const pedidoRef = doc(db, "pedidos", documentoMesaIdAtual);
+                    await updateDoc(pedidoRef, {
+                        itens: itensAtualizados,
+                        total: novoTotal,
+                        status: 'pendente' // Volta para pendente para a impressora da cozinha cuspir o papel extra!
+                    });
+                }
+            } else {
+                // Se a mesa estava livre, cria uma nova ordem do zero no Firebase
+                const novoObj = {
+                    cliente: nomeCliente,
+                    clienteNome: nomeCliente,
+                    tipo: 'mesa',
+                    mesa: mesaSelecionadaNum,
+                    numeroMesa: mesaSelecionadaNum,
+                    itens: [`1x ${nomeItem}`],
+                    total: precoItem,
+                    subtotal: precoItem,
+                    status: 'pendente',
+                    criadoEm: new Date().toISOString()
+                };
+
+                if (db) {
+                    const novoPedidoRef = doc(collection(db, "pedidos"));
+                    await setDoc(novoPedidoRef, novoObj);
+                } else {
+                    pedidosNoSalao[mesaSelecionadaNum] = { id: `mesa-${Date.now()}`, ...novoObj };
+                    renderizarGridDeMesas();
+                }
+            }
+
+            alert(`✅ Item lançado com sucesso na Mesa ${mesaSelecionadaNum}! Enviado para a chapa.`);
+            window.fecharModalMesa();
+        } catch (erro) {
+            console.error("Erro ao disparar pedido:", erro);
+            alert("Erro ao salvar pedido na mesa: " + (erro.message || ''));
+        }
+    };
+
+    // Fechar conta da mesa
+    window.concluirPagamentoMesa = async function() {
+        if (!confirm(`Deseja fechar a conta da Mesa ${mesaSelecionadaNum} e liberar a mesa para novos clientes?`)) return;
+
+        try {
+            if (documentoMesaIdAtual && db) {
+                const pedidoRef = doc(db, "pedidos", documentoMesaIdAtual);
+                await updateDoc(pedidoRef, {
+                    status: 'finalizado_local',
+                    fechadoEm: new Date().toISOString()
+                });
+            }
+            delete pedidosNoSalao[mesaSelecionadaNum];
+            renderizarGridDeMesas();
+            window.fecharModalMesa();
+            alert(`💳 Conta da Mesa ${mesaSelecionadaNum} finalizada com sucesso! Mesa liberada.`);
+        } catch (erro) {
+            console.error("Erro ao liberar mesa:", erro);
+            alert("Erro ao liberar mesa: " + erro.message);
+        }
+    };
+
+    // Abrir o cardápio digital simulando o QR code da mesa
+    window.abrirCardapioMesa = function() {
+        if (!mesaSelecionadaNum) return;
+        window.open(`/cardapio.html?mesa=${mesaSelecionadaNum}`, '_blank');
+    };
+</script>
+</body>
+</html>

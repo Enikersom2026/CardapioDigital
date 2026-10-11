@@ -11,13 +11,14 @@ import {
   ChevronDown,
   LayoutDashboard,
   DollarSign,
+  Package,
 } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'painel' | 'atendimento' | 'logistica' | 'entregador' | 'mesas' | 'admin' | 'preview' | 'delivery' | 'ideas' | 'export';
   setActiveTab: (tab: 'painel' | 'atendimento' | 'logistica' | 'entregador' | 'mesas' | 'admin' | 'preview' | 'delivery' | 'ideas' | 'export') => void;
-  painelSubTab?: 'dashboard' | 'vendas' | 'financeiro';
-  onSelectPainelSubTab?: (subTab: 'dashboard' | 'vendas' | 'financeiro') => void;
+  painelSubTab?: 'dashboard' | 'vendas' | 'financeiro' | 'estoque';
+  onSelectPainelSubTab?: (subTab: 'dashboard' | 'vendas' | 'financeiro' | 'estoque') => void;
   menuCount: number;
   onOpenSettings?: () => void;
   restaurantName: string;
@@ -175,6 +176,26 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <div>
                           <span className="block leading-none">Financeiro & Métricas</span>
                           <span className="text-[10px] text-zinc-400 font-normal">Faturamento, custos e apurações</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('painel');
+                          onSelectPainelSubTab?.('estoque');
+                          setDropdownPainelAberto(false);
+                        }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer text-left ${
+                          activeTab === 'painel' && painelSubTab === 'estoque'
+                            ? 'bg-[#ff4b2b] text-white shadow-xs'
+                            : 'text-zinc-300 hover:bg-[#202024] hover:text-white'
+                        }`}
+                      >
+                        <Package className="w-4 h-4 text-amber-400" />
+                        <div>
+                          <span className="block leading-none">Estoque de Insumos</span>
+                          <span className="text-[10px] text-zinc-400 font-normal">Carnes, pães, frios e embalagens</span>
                         </div>
                       </button>
                     </div>
