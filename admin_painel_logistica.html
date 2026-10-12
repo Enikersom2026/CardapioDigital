@@ -33,8 +33,14 @@
 
       <!-- Action Buttons Hardware -->
       <div class="flex flex-wrap items-center gap-2">
+        <a href="admin_painel_geral.html" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold rounded-xl border border-zinc-700 flex items-center gap-1.5 transition-all text-zinc-300">
+          📊 Centro de Comando
+        </a>
+        <a href="admin_configuracoes.html" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold rounded-xl border border-zinc-700 flex items-center gap-1.5 transition-all text-zinc-300">
+          ⚙️ Configurações
+        </a>
         <a href="/" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold rounded-xl border border-zinc-700 flex items-center gap-1.5 transition-all text-zinc-300">
-          ⬅ Ir para o App Principal
+          ⬅ Ir para o App
         </a>
 
         <!-- Botão Conectar USB -->
@@ -230,28 +236,31 @@
             console.log("Nenhuma impressora conectada no hardware. Salvando impressão em log.");
         }
     }
+    window.enviarParaImpressora = enviarParaImpressora;
 
-    // Transforma o objeto do Firebase em um layout de texto limpo para bobina térmica
+    // FORMATA A COMANDA DE FORMA ULTRA RÁPIDA PARA A CHAPA
     window.imprimirComandaCozinha = function(pedido) {
         let cupom = `================================\n`;
         cupom += `       DOM GABRIEL HAMBURGUERIA \n`;
         cupom += `================================\n`;
-        cupom += `💥 COMANDA: #${(pedido.id || '0000').substring(0,5).toUpperCase()}\n`;
-        cupom += `Modo: ${pedido.tipo === 'mesa' ? '🪑 MESA ' + (pedido.mesa || '01') : '🛵 DELIVERY'}\n`;
-        cupom += `Cliente: ${pedido.cliente || pedido.clienteNome || 'Cliente'}\n`;
+        
+        // 🚨 REGRA DE IDENTIFICAÇÃO CRUCIAL:
+        if (pedido.tipo === 'mesa') {
+            // Se for consumo no local, o destaque total vai para o número da mesa
+            cupom += `🪑 ATENDIMENTO LOCAL: MESA ${String(pedido.mesa).padStart(2, '0')}\n`;
+        } else {
+            // Se for para a viagem / delivery, destaca o número de controle sequencial
+            // Se não houver número curto ainda, pega os 5 primeiros dígitos do ID do Firebase
+            const numeroIdentificador = pedido.numeroSequencial || (pedido.id ? pedido.id.substring(0,5).toUpperCase() : '0000');
+            cupom += `📦 PEDIDO VIAGEM/DELIVERY: #${numeroIdentificador}\n`;
+        }
+        
         cupom += `--------------------------------\n`;
-        cupom += `📋 ITENS PARA A CHAPA:\n`;
+        cupom += `📋 ITENS PARA A COZINHA:\n`;
         
         if (pedido.itens && pedido.itens.length > 0) {
             pedido.itens.forEach(item => {
-                if (typeof item === 'string') {
-                    cupom += `• ${item}\n`;
-                } else if (item && typeof item === 'object') {
-                    const q = item.quantidade || 1;
-                    const n = item.nome || 'Item';
-                    const extras = item.adicionais ? ' [' + item.adicionais.join(', ') + ']' : '';
-                    cupom += `• ${q}x ${n}${extras}\n`;
-                }
+                cupom += `• ${item}\n`; // Puxa o burger com os adicionais já somados no texto
             });
         }
 
@@ -262,6 +271,7 @@
         cupom += `Horario: ${new Date().toLocaleTimeString('pt-BR')}\n`;
         cupom += `================================\n`;
 
+        // Dispara para o hardware da impressora USB ou Bluetooth
         enviarParaImpressora(cupom);
     };
 

@@ -160,6 +160,17 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
 
   // Escuta Firestore em tempo real
   useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'totalMesasLayout' && e.newValue) {
+        const val = parseInt(e.newValue);
+        if (val > 0) setTotalMesasConfiguradas(val);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  useEffect(() => {
     try {
       const unsub = onSnapshot(collection(db, 'comandas'), (snapshot) => {
         if (!snapshot.empty) {
@@ -903,6 +914,26 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  id="btnCadastrarMesa"
+                  onClick={() => {
+                    const novaQtd = totalMesasConfiguradas + 1;
+                    setTotalMesasConfiguradas(novaQtd);
+                    try {
+                      localStorage.setItem('totalMesasLayout', String(novaQtd));
+                      window.dispatchEvent(new Event('storage'));
+                    } catch {}
+                    setFeedbackLancamento(`🎉 Mesa ${novaQtd} cadastrada com sucesso no salão!`);
+                    setTimeout(() => setFeedbackLancamento(null), 3500);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs"
+                  title="Cadastrar +1 mesa imediatamente no salão"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Cadastrar Mesa (+1)</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => {
                     const novo = prompt('Quantas mesas seu salão possui?', String(totalMesasConfiguradas));
                     if (novo && !isNaN(parseInt(novo)) && parseInt(novo) > 0) {
@@ -910,13 +941,14 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                       setTotalMesasConfiguradas(qtd);
                       try {
                         localStorage.setItem('totalMesasLayout', String(qtd));
+                        window.dispatchEvent(new Event('storage'));
                       } catch {}
                     }
                   }}
                   className="px-2.5 py-1.5 rounded-lg bg-[#202024] hover:bg-[#28282e] border border-[#29292e] text-zinc-300 hover:text-white text-xs font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap"
                   title="Configurar quantidade total de mesas do salão"
                 >
-                  <span>⚙️ Qtd de Mesas</span>
+                  <span>⚙️ Limite Mesas</span>
                   <span className="font-mono text-cyan-400">({totalMesasConfiguradas})</span>
                 </button>
 

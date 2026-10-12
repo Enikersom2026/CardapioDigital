@@ -1,0 +1,40 @@
+# Netlify Redirects - Dom Gabriel Hamburgueria
+# Rotas amigáveis para módulos dedicados HTML
+/cardapio               /cardapio.html              200
+/carrinho               /carrinho.html              200
+/admin_dashboard        /admin_dashboard.html       200
+/dashboard              /admin_dashboard.html       200
+/admin_painel_estoque   /admin_painel_estoque.html  200
+/admin_estoque          /admin_estoque.html         200
+/estoque                /admin_estoque.html         200
+/admin_master          /admin_master.html          200
+/admin_painel           /admin_master.html          200
+/admin_painel_geral     /admin_painel_geral.html    200
+/admin_geral            /admin_painel_geral.html    200
+/centro_comando         /admin_painel_geral.html    200
+/painel_geral           /admin_painel_geral.html    200
+/admin_painel_logistica /admin_painel_logistica.html 200
+/logistica              /admin_painel_logistica.html 200
+/admin_painel_mesas     /admin_painel_mesas.html    200
+/mesas                  /admin_painel_mesas.html    200
+/admin_configuracoes_mesas /admin_configuracoes_mesas.html 200
+/admin_configuracoes    /admin_configuracoes.html   200
+/configuracoes          /admin_configuracoes.html   200
+/config                 /admin_configuracoes.html   200
+/admin_cadastro         /admin_cadastro.html        200
+/cadastro               /admin_cadastro.html        200
+/admin_qrcodes          /admin_qrcodes.html         200
+/qrcodes                /admin_qrcodes.html         200
+
+# Redirecionamentos para as abas do app principal React
+/entregador.html        /?tab=entregador            302
+/entregador             /?tab=entregador            302
+/admin.html             /?tab=admin                 302
+/admin                  /?tab=admin                 302
+/acompanhar.html        /?tab=preview               302
+/acompanhar             /?tab=preview               302
+/auth.html              /?screen=auth               302
+/auth                   /?screen=auth               302
+
+# SPA Fallback para React Router / navegação do app
+/*                      /index.html                 200

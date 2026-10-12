@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Geral Administrativo | Dom Gabriel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #0f0f12; color: white; min-height: 100vh; display: flex; }
+
+        /* MENU LATERAL (SIDEBAR) */
+        .sidebar {
+            width: 270px;
+            background: #141418;
+            border-right: 1px solid #29292e;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px 16px;
+            flex-shrink: 0;
+            min-height: 100vh;
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #29292e;
+            margin-bottom: 20px;
+        }
+
+        .sidebar-brand img {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            object-fit: cover;
+            border: 1px solid #3e3e46;
+        }
+
+        .sidebar-brand-text h2 {
+            font-size: 16px;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar-brand-text span {
+            font-size: 11px;
+            color: #ff4b2b;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .nav-section-title {
+            font-size: 10px;
+            color: #8d8d99;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+            margin: 10px 8px 4px 8px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            color: #c4c4cc;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .nav-btn:hover {
+            background: #202024;
+            color: #fff;
+            border-color: #29292e;
+            transform: translateX(3px);
+        }
+
+        .nav-btn.active {
+            background: rgba(255, 75, 43, 0.15);
+            color: #ff4b2b;
+            border-color: rgba(255, 75, 43, 0.4);
+            font-weight: 700;
+        }
+
+        .sidebar-footer {
+            border-top: 1px solid #29292e;
+            padding-top: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .btn-voltar-app {
+            background: #202024;
+            border: 1px solid #29292e;
+            color: #8d8d99;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: 0.2s;
+        }
+
+        .btn-voltar-app:hover {
+            color: white;
+            border-color: #ff4b2b;
+        }
+
+        /* CONTEÚDO PRINCIPAL */
+        .main-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            max-width: 900px;
+        }
+
+        header {
+            border-bottom: 1px solid #29292e;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 24px;
+            font-weight: 800;
+            color: #ff4b2b;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        header p {
+            font-size: 14px;
+            color: #8d8d99;
+            margin-top: 5px;
+        }
+
+        .grid-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 16px;
+        }
+
+        .card-modulo {
+            background: #1a1a1e;
+            border: 1px solid #29292e;
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-decoration: none;
+            color: white;
+        }
+
+        .card-modulo:hover {
+            border-color: #ff4b2b;
+            transform: translateY(-2px);
+            background: #202024;
+            box-shadow: 0 8px 24px rgba(255, 75, 43, 0.1);
+        }
+
+        .modulo-icone {
+            font-size: 28px;
+            background: #29292e;
+            width: 54px;
+            height: 54px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .modulo-info { flex: 1; }
+        .modulo-info h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #fff; }
+        .modulo-info p { font-size: 12px; color: #8d8d99; line-height: 1.4; }
+        .seta-link { font-size: 18px; color: #ff4b2b; font-weight: bold; }
+
+        @media (max-width: 820px) {
+            body { flex-direction: column; }
+            .sidebar {
+                width: 100%;
+                min-height: auto;
+                border-right: none;
+                border-bottom: 1px solid #29292e;
+                padding: 16px;
+            }
+            .sidebar-nav {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+            .grid-dashboard {
+                grid-template-columns: 1fr;
+            }
+            .main-content { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- MENU LATERAL HTML (SIDEBAR) -->
+    <aside class="sidebar">
+        <div>
+            <div class="sidebar-brand">
+                <img src="emblema_dom_gabriel.png" alt="Dom Gabriel Logo" onerror="this.src='/emblema_dom_gabriel.png'">
+                <div class="sidebar-brand-text">
+                    <h2>Dom Gabriel</h2>
+                    <span>Painel Administrativo</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section-title">Módulos do Sistema</div>
+                <button class="nav-btn" id="btn-dashboard" onclick="navegarPara('dashboard')">📊 Visão Geral</button>
+                <button class="nav-btn" id="btn-logistica" onclick="navegarPara('logistica')">🛵 Logística & Motoboys</button>
+                <button class="nav-btn" id="btn-mesas" onclick="navegarPara('mesas')">🍽️ Gerenciador do Salão</button>
+                <button class="nav-btn" id="btn-cadastro" onclick="navegarPara('cadastro')">🍔 Cardápio com IA</button>
+                <button class="nav-btn" id="btn-config" onclick="navegarPara('config')">⚙️ Configurações</button>
+            </nav>
+        </div>
+
+        <div class="sidebar-footer">
+            <a href="cardapio.html" target="_blank" class="btn-voltar-app">📖 Ver Cardápio Online</a>
+            <a href="/" class="btn-voltar-app">🏠 Ir ao App Principal</a>
+        </div>
+    </aside>
+
+    <!-- ÁREA DE CONTEÚDO PRINCIPAL -->
+    <main class="main-content">
+        <header>
+            <h1>🍔 Dom Gabriel - Centro de Comando</h1>
+            <p>Painel Administrativo Unificado de Gestão Operacional e Fiscal</p>
+        </header>
+
+        <section class="grid-dashboard">
+            <a href="admin_dashboard.html" class="card-modulo">
+                <div class="modulo-icone">📊</div>
+                <div class="modulo-info">
+                    <h3>Visão Geral do Negócio</h3>
+                    <p>Métricas diárias, fechamento de caixa automatizado e controle de estoque de insumos.</p>
+                </div>
+                <div class="seta-link">➔</div>
+            </a>
+
+            <a href="admin_painel_logistica.html" class="card-modulo">
+                <div class="modulo-icone">🛵</div>
+                <div class="modulo-info">
+                    <h3>Monitor de Logística & Motoboys</h3>
+                    <p>Gerencie pedidos para entrega, despache os motoboys e acompanhe em tempo real.</p>
+                </div>
+                <div class="seta-link">➔</div>
+            </a>
+
+            <a href="admin_painel_mesas.html" class="card-modulo">
+                <div class="modulo-icone">🍽️</div>
+                <div class="modulo-info">
+                    <h3>Gerenciador do Salão Físico</h3>
+                    <p>Abra e adicione mesas ao salão em tempo real. Lançamentos automáticos para a cozinha.</p>
+                </div>
+                <div class="seta-link">➔</div>
+            </a>
+
+            <a href="admin_cadastro.html" class="card-modulo">
+                <div class="modulo-icone">🍔</div>
+                <div class="modulo-info">
+                    <h3>Cardápio Inteligente com IA</h3>
+                    <p>Criação e edição de hambúrgueres artesanais com descrições gastronômicas geradas por IA.</p>
+                </div>
+                <div class="seta-link">➔</div>
+            </a>
+
+            <a href="admin_configuracoes.html" class="card-modulo">
+                <div class="modulo-icone">⚙️</div>
+                <div class="modulo-info">
+                    <h3>Configurações de Hardware e Salão</h3>
+                    <p>Gerencie portas de impressora térmica USB/Bluetooth, alertas sonoros e capacidade do salão.</p>
+                </div>
+                <div class="seta-link">➔</div>
+            </a>
+
+            <a href="admin_qrcodes.html" class="card-modulo">
+                <div class="modulo-icone">📐</div>
+                <div class="modulo-info">
+                    <h3>Tags de Mesa e QR Code</h3>
+                    <p>Gere e imprima em lotes os códigos QR dinâmicos para atendimento sem garçom.</p>
+                </div>
+                <div class="seta-link">➔</div>
+            </a>
+        </section>
+    </main>
+
+    <!-- SCRIPT DE ROTAS E NAVEGAÇÃO -->
+    <script src="admin_rotas.js"></script>
+</body>
+</html>

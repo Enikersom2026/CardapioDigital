@@ -335,9 +335,25 @@
       try {
         const sacolaStr = localStorage.getItem('dom_gabriel_sacola') || localStorage.getItem('carrinho_dom_gabriel');
         if (sacolaStr) {
-          itensCarrinho = JSON.parse(sacolaStr);
-        } else {
-          itensCarrinho = [];
+          const parsed = JSON.parse(sacolaStr);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            itensCarrinho = parsed;
+          }
+        }
+
+        if (!itensCarrinho || itensCarrinho.length === 0) {
+          const meuCarStr = localStorage.getItem('meuCarrinho');
+          if (meuCarStr) {
+            const parsedMeu = JSON.parse(meuCarStr);
+            if (Array.isArray(parsedMeu) && parsedMeu.length > 0) {
+              itensCarrinho = parsedMeu.map((item, idx) => ({
+                id: `item-meu-${idx}`,
+                nome: item.nome,
+                preco: parseFloat(item.preco),
+                quantidade: item.quantidade || 1
+              }));
+            }
+          }
         }
       } catch (e) {
         itensCarrinho = [];
@@ -349,6 +365,16 @@
     function salvarCarrinho() {
       localStorage.setItem('dom_gabriel_sacola', JSON.stringify(itensCarrinho));
       localStorage.setItem('carrinho_dom_gabriel', JSON.stringify(itensCarrinho));
+
+      const flat = [];
+      itensCarrinho.forEach(it => {
+        const q = it.quantidade || 1;
+        for (let i = 0; i < q; i++) {
+          flat.push({ nome: it.nome, preco: parseFloat(it.preco) });
+        }
+      });
+      localStorage.setItem('meuCarrinho', JSON.stringify(flat));
+
       renderizarItens();
     }
 
@@ -386,28 +412,28 @@
           const totalItem = preco * qtd;
 
           return `
-            <div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
-              <div class="flex-1 min-w-0">
-                <h4 class="text-xs sm:text-sm font-extrabold text-white truncate">${nome}</h4>
-                <p class="text-[11px] text-zinc-400 font-mono mt-0.5">${qtd}x R$ ${preco.toFixed(2).replace('.', ',')}</p>
+            <div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-3.5 flex items-start justify-between gap-3 shadow-sm">
+              <div class="flex-1 min-w-0 pr-2">
+                <h4 class="text-xs sm:text-sm font-extrabold text-white whitespace-pre-line leading-relaxed">${nome}</h4>
+                <p class="text-[11px] text-zinc-400 font-mono mt-1">${qtd}x R$ ${preco.toFixed(2).replace('.', ',')}</p>
               </div>
 
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-3 shrink-0 pt-0.5">
                 <span class="text-xs sm:text-sm font-black text-cyan-400 font-mono">
                   R$ ${totalItem.toFixed(2).replace('.', ',')}
                 </span>
 
                 <div class="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-2 py-1">
-                  <button type="button" onclick="alterarQuantidade(${index}, -1)" class="w-5 h-5 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center text-xs font-bold transition-colors">
+                  <button type="button" onclick="alterarQuantidade(${index}, -1)" class="w-5 h-5 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center text-xs font-bold transition-colors cursor-pointer">
                     -
                   </button>
                   <span class="text-xs font-bold text-white font-mono px-1">${qtd}</span>
-                  <button type="button" onclick="alterarQuantidade(${index}, 1)" class="w-5 h-5 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center text-xs font-bold transition-colors">
+                  <button type="button" onclick="alterarQuantidade(${index}, 1)" class="w-5 h-5 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center text-xs font-bold transition-colors cursor-pointer">
                     +
                   </button>
                 </div>
 
-                <button type="button" onclick="removerItem(${index})" class="text-zinc-500 hover:text-red-400 transition-colors p-1" title="Remover item">
+                <button type="button" onclick="removerItem(${index})" class="text-zinc-500 hover:text-red-400 transition-colors p-1 cursor-pointer" title="Remover item">
                   🗑️
                 </button>
               </div>

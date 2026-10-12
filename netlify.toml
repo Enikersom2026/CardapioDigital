@@ -1,0 +1,107 @@
+# Netlify Configuration - Dom Gabriel Hamburgueria & Studio 405
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
+
+# Headers de segurança e cache otimizado
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Proxy das rotas de API para o handler Serverless da Netlify
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+# Rotas limpas para telas estáticas do sistema
+[[redirects]]
+  from = "/cardapio"
+  to = "/cardapio.html"
+  status = 200
+
+[[redirects]]
+  from = "/carrinho"
+  to = "/carrinho.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin_dashboard"
+  to = "/admin_dashboard.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard"
+  to = "/admin_dashboard.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin_painel_estoque"
+  to = "/admin_painel_estoque.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin_estoque"
+  to = "/admin_estoque.html"
+  status = 200
+
+[[redirects]]
+  from = "/estoque"
+  to = "/admin_estoque.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin_painel_geral"
+  to = "/admin_painel_geral.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin_painel_logistica"
+  to = "/admin_painel_logistica.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin_painel_mesas"
+  to = "/admin_painel_mesas.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin_qrcodes"
+  to = "/admin_qrcodes.html"
+  status = 200
+
+# Redirecionamentos de abas internas
+[[redirects]]
+  from = "/entregador"
+  to = "/?tab=entregador"
+  status = 302
+
+[[redirects]]
+  from = "/admin"
+  to = "/?tab=admin"
+  status = 302
+
+[[redirects]]
+  from = "/acompanhar"
+  to = "/?tab=preview"
+  status = 302
+
+# SPA fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

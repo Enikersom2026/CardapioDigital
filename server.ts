@@ -32,12 +32,24 @@ app.get('/admin_painel_mesas.html', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, 'admin_painel_mesas.html'));
 });
 
-app.get(['/admin_dashboard.html', '/admin_dashboard', '/dashboard.html', '/dashboard'], (_req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, 'admin_dashboard.html'));
+app.get(['/admin_master.html', '/admin_master', '/admin_painel.html', '/admin_painel'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'admin_master.html'));
 });
 
-app.get(['/admin_painel_estoque.html', '/estoque.html'], (_req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, 'admin_painel_estoque.html'));
+app.get(['/admin_painel_geral.html', '/admin_geral.html', '/centro_comando.html', '/painel_geral.html'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'admin_painel_geral.html'));
+});
+
+app.get(['/admin_qrcodes.html', '/qrcodes.html', '/qrcode.html'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'admin_qrcodes.html'));
+});
+
+app.get(['/admin_estoque.html', '/admin_painel_estoque.html', '/estoque.html'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'admin_estoque.html'));
+});
+
+app.get(['/admin_dashboard.html', '/admin_dashboard', '/dashboard.html', '/dashboard'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'admin_dashboard.html'));
 });
 
 app.get(['/cardapio.html', '/cardapio'], (_req: Request, res: Response) => {
@@ -48,8 +60,16 @@ app.get(['/carrinho.html', '/carrinho'], (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, 'carrinho.html'));
 });
 
+app.get(['/admin_configuracoes.html', '/admin_configuracoes', '/admin_configuracoes_mesas.html', '/configuracoes.html', '/configuracoes', '/config'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'admin_configuracoes.html'));
+});
+
+app.get(['/admin_cadastro.html', '/admin_cadastro', '/cadastro.html', '/cadastro'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'admin_cadastro.html'));
+});
+
 app.get('/entregador.html', (_req: Request, res: Response) => res.redirect('/?tab=entregador'));
-app.get(['/admin.html', '/admin_cadastro.html'], (_req: Request, res: Response) => res.redirect('/?tab=admin'));
+app.get('/admin.html', (_req: Request, res: Response) => res.redirect('/?tab=admin'));
 app.get('/acompanhar.html', (_req: Request, res: Response) => res.redirect('/?tab=preview'));
 app.get('/auth.html', (_req: Request, res: Response) => res.redirect('/?screen=auth'));
 

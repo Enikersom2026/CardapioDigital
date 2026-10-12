@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cardápio Inteligente com IA | Dom Gabriel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #0f0f12; color: white; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+        
+        header { width: 100%; max-width: 900px; text-align: center; border-bottom: 1px solid #29292e; padding-bottom: 20px; margin-bottom: 25px; }
+        header h1 { font-size: 22px; font-weight: 800; color: #ff4b2b; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        header p { font-size: 13px; color: #8d8d99; margin-top: 5px; }
+
+        .nav-rotas-bar { width: 100%; max-width: 900px; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 15px; margin-bottom: 20px; scrollbar-width: none; }
+        .nav-rotas-bar::-webkit-scrollbar { display: none; }
+        .rota-pill { background: #1a1a1e; border: 1px solid #29292e; color: #c4c4cc; padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .rota-pill:hover { border-color: #ff4b2b; color: white; background: #202024; }
+        .rota-pill.active { background: #ff4b2b; color: white; border-color: #ff4b2b; box-shadow: 0 4px 12px rgba(255,75,43,0.3); }
+
+        .layout-grid { width: 100%; max-width: 900px; display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px; }
+        @media (max-width: 820px) { .layout-grid { grid-template-columns: 1fr; } }
+
+        .card-modulo { background: #1a1a1e; border: 1px solid #29292e; border-radius: 16px; padding: 22px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+        h3 { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 16px; border-bottom: 1px solid #29292e; padding-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+
+        label { display: block; font-size: 12px; color: #c4c4cc; margin-top: 12px; margin-bottom: 4px; font-weight: 600; }
+        input, select, textarea { width: 100%; padding: 11px; border: 1px solid #29292e; background: #202024; color: white; border-radius: 8px; font-size: 13px; }
+        input:focus, select:focus, textarea:focus { border-color: #ff4b2b; outline: none; }
+        textarea { resize: vertical; min-height: 70px; }
+
+        .btn-ia { width: 100%; margin-top: 6px; padding: 9px; border: 1px dashed #a855f7; background: rgba(168,85,247,0.1); color: #d8b4fe; font-size: 12px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-ia:hover { background: rgba(168,85,247,0.25); border-color: #c084fc; color: #fff; }
+
+        .btn-gravar { width: 100%; margin-top: 18px; padding: 13px; background: #ff4b2b; color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 14px rgba(255,75,43,0.3); }
+        .btn-gravar:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        .itens-lista { display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto; padding-right: 4px; }
+        .item-card { background: #202024; border: 1px solid #29292e; border-radius: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; transition: 0.2s; }
+        .item-card:hover { border-color: #3e3e46; background: #242429; }
+        .item-info { flex: 1; }
+        .item-nome { font-size: 14px; font-weight: 700; color: #fff; }
+        .item-categoria { font-size: 11px; color: #ffb86c; font-weight: 600; text-transform: uppercase; }
+        .item-desc { font-size: 11px; color: #8d8d99; margin-top: 2px; line-height: 1.3; }
+        .item-preco { font-size: 14px; font-weight: 800; color: #00b37e; }
+        .btn-excluir { background: transparent; border: 1px solid #dc3545; color: #dc3545; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-excluir:hover { background: #dc3545; color: white; }
+
+        .footer-nav { margin-top: 25px; margin-bottom: 30px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        .btn-voltar { background: #202024; border: 1px solid #29292e; color: #8d8d99; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: bold; text-decoration: none; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-voltar:hover { color: white; border-color: #ff4b2b; background: #29292e; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🍔 Cardápio Inteligente com IA</h1>
+        <p>Criação Automatizada de Hambúrgueres e Descrições Gastronômicas • Dom Gabriel</p>
+    </header>
+
+    <!-- Barra de Navegação com as Rotas -->
+    <nav class="nav-rotas-bar" id="barraRotasNav"></nav>
+
+    <div class="layout-grid">
+        <!-- FORMULÁRIO DE CADASTRO COM IA -->
+        <div class="card-modulo">
+            <h3>✨ Novo Item no Cardápio</h3>
+
+            <label for="nomePratoInput">Nome do Produto / Hambúrguer:</label>
+            <input type="text" id="nomePratoInput" placeholder="Ex: Dom Gabriel Brutal Bacon">
+
+            <label for="categoriaInput">Categoria:</label>
+            <select id="categoriaInput">
+                <option value="Hambúrgueres Artesanais">🍔 Hambúrgueres Artesanais</option>
+                <option value="Combos Especiais">🍟 Combos Especiais</option>
+                <option value="Bebidas & Sobremesas">🥤 Bebidas & Sobremesas</option>
+                <option value="Adicionais">🥓 Adicionais & Extras</option>
+            </select>
+
+            <label for="precoInput">Preço de Venda (R$):</label>
+            <input type="number" step="0.50" id="precoInput" placeholder="Ex: 38.90">
+
+            <label for="descInput">Descrição Gastronômica:</label>
+            <textarea id="descInput" placeholder="Pão brioche selado na manteiga, blend suculento de 180g grelhado na brasa..."></textarea>
+            
+            <button type="button" class="btn-ia" onclick="gerarDescricaoComIA()">
+                ✨ Gerar Descrição Irresistível com IA
+            </button>
+
+            <button type="button" class="btn-gravar" onclick="salvarItemCardapio()">
+                💾 Gravar Item no Cardápio Digital
+            </button>
+        </div>
+
+        <!-- LISTA EM TEMPO REAL DOS ITENS ATIVOS -->
+        <div class="card-modulo">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #29292e; padding-bottom:8px;">
+                <h3 style="margin:0; border:none; padding:0;">📋 Itens Ativos no Cardápio</h3>
+                <span id="contadorItens" style="font-size:12px; color:#ffb86c; font-weight:bold;">0 itens</span>
+            </div>
+
+            <div class="itens-lista" id="listaItensCardapio">
+                <!-- Renderizado via JS -->
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-nav">
+        <a href="cardapio.html" target="_blank" class="btn-voltar">📖 Visualizar Cardápio do Cliente</a>
+        <a href="admin_painel_geral.html" class="btn-voltar">🍔 Centro de Comando</a>
+        <a href="admin_configuracoes.html" class="btn-voltar">⚙️ Configurações</a>
+        <a href="/" class="btn-voltar">🏠 Sistema Principal</a>
+    </div>
+
+<script>
+    // 🚨 DEFINIÇÃO OFICIAL DAS ROTAS DO DOM GABRIEL
+    const rotas = {
+        dashboard: { url: 'admin_dashboard.html', titulo: 'Visão Geral do Negócio' },
+        logistica: { url: 'admin_painel_logistica.html', titulo: 'Monitor de Logística & Motoboys' },
+        mesas:     { url: 'admin_painel_mesas.html', titulo: 'Gerenciador do Salão Físico' },
+        cadastro:  { url: 'admin_cadastro.html', titulo: 'Cardápio Inteligente com IA' },
+        config:    { url: 'admin_configuracoes.html', titulo: 'Configurações de Hardware e Salão' } // 🚨 NOVA ROTA AQUI!
+    };
+    window.rotas = rotas;
+
+    // Itens padrão caso storage esteja vazio
+    const ITENS_PADRAO = [
+        { id: '1', nome: 'Burger Brutal Smash', categoria: 'Hambúrgueres Artesanais', preco: 34.90, descricao: 'Dois smash burgers de 90g com crostinha crocante, queijo cheddar inglês derretido, cebola caramelizada e maionese da casa.' },
+        { id: '2', nome: 'Dom Gabriel Especial 200g', categoria: 'Hambúrgueres Artesanais', preco: 42.00, descricao: 'Blend nobre de costela bovina 200g grelhado no ponto perfeito, bacon artesanal defumado e pão brioche dourado.' },
+        { id: '3', nome: 'Combo Clássico Fritas + Refri', categoria: 'Combos Especiais', preco: 49.90, descricao: 'Hambúrguer artesanal acompanhado de batatas rústicas com páprica defumada e refrigerante lata gelado.' },
+        { id: '4', nome: 'Coca-Cola Zero 350ml', categoria: 'Bebidas & Sobremesas', preco: 7.00, descricao: 'Lata 350ml trincando de gelada com gelo e limão.' }
+    ];
+
+    function obterItens() {
+        try {
+            const salvos = localStorage.getItem('domgabriel_cardapio_custom');
+            if (salvos) return JSON.parse(salvos);
+        } catch(e) {}
+        return ITENS_PADRAO;
+    }
+
+    function renderizarItens() {
+        const itens = obterItens();
+        const container = document.getElementById('listaItensCardapio');
+        const contador = document.getElementById('contadorItens');
+        if (contador) contador.innerText = `${itens.length} itens`;
+        if (!container) return;
+
+        container.innerHTML = '';
+        itens.forEach((item, index) => {
+            const card = document.createElement('div');
+            card.className = 'item-card';
+            card.innerHTML = `
+                <div class="item-info">
+                    <div class="item-categoria">${item.categoria}</div>
+                    <div class="item-nome">${item.nome}</div>
+                    <div class="item-desc">${item.descricao || ''}</div>
+                </div>
+                <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                    <div class="item-preco">R$ ${Number(item.preco).toFixed(2).replace('.', ',')}</div>
+                    <button class="btn-excluir" onclick="excluirItem(${index})">🗑️ Excluir</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    window.salvarItemCardapio = function() {
+        const nome = document.getElementById('nomePratoInput').value.trim();
+        const categoria = document.getElementById('categoriaInput').value;
+        const preco = parseFloat(document.getElementById('precoInput').value);
+        const descricao = document.getElementById('descInput').value.trim();
+
+        if (!nome) {
+            alert('Por favor, digite o nome do produto.');
+            return;
+        }
+        if (!preco || preco <= 0) {
+            alert('Por favor, informe um preço de venda válido.');
+            return;
+        }
+
+        const itens = obterItens();
+        itens.unshift({
+            id: 'item-' + Date.now(),
+            nome,
+            categoria,
+            preco,
+            descricao
+        });
+
+        localStorage.setItem('domgabriel_cardapio_custom', JSON.stringify(itens));
+        
+        // Limpa campos
+        document.getElementById('nomePratoInput').value = '';
+        document.getElementById('precoInput').value = '';
+        document.getElementById('descInput').value = '';
+
+        renderizarItens();
+        alert(`🎉 "${nome}" gravado com sucesso no Cardápio Digital!`);
+    };
+
+    window.excluirItem = function(index) {
+        if (!confirm('Deseja excluir este item do cardápio?')) return;
+        const itens = obterItens();
+        itens.splice(index, 1);
+        localStorage.setItem('domgabriel_cardapio_custom', JSON.stringify(itens));
+        renderizarItens();
+    };
+
+    // Inteligência Artificial Gastronômica
+    window.gerarDescricaoComIA = function() {
+        const nome = document.getElementById('nomePratoInput').value.trim();
+        if (!nome) {
+            alert('Digite o nome do hambúrguer primeiro para a IA gerar a descrição!');
+            return;
+        }
+
+        const adjetivos = [
+            'suculento blend artesanal grelhado na brasa',
+            'camadas generosas de queijo cheddar inglês fundido',
+            'bacon crocante defumado em lenha nobre de macieira',
+            'pão brioche artesanal selado delicadamente na manteiga de garrafa',
+            'maionese verde especial temperada com ervas frescas da casa',
+            'cebola caramelizada lentamente ao toque de cerveja preta'
+        ];
+        
+        const combinados = [
+            `${nome}: preparado com ${adjetivos[0]}, coberto por ${adjetivos[1]}, ${adjetivos[2]} e servido em ${adjetivos[3]}. Uma explosão incomparável de sabores a cada mordida!`,
+            `${nome}: uma obra de arte da chapa com ${adjetivos[0]}, ${adjetivos[4]}, fatias de ${adjetivos[2]} e finalizado com ${adjetivos[5]} no pão artesanal tostado.`,
+            `${nome}: receita exclusiva da Dom Gabriel combinando ${adjetivos[0]} de ponto perfeito, ${adjetivos[1]} e toque aveludado de ${adjetivos[4]}. Impossível comer um só!`
+        ];
+
+        const escolhida = combinados[Math.floor(Math.random() * combinados.length)];
+        document.getElementById('descInput').value = escolhida;
+    };
+
+    // Renderiza a barra de navegação superior com as rotas
+    function renderizarBarraRotas() {
+        const bar = document.getElementById('barraRotasNav');
+        if (!bar) return;
+        bar.innerHTML = '';
+
+        const icones = {
+            dashboard: '📊',
+            logistica: '🛵',
+            mesas: '🍽️',
+            cadastro: '🍔',
+            config: '⚙️'
+        };
+
+        Object.entries(rotas).forEach(([chave, info]) => {
+            const link = document.createElement('a');
+            link.href = info.url;
+            link.className = `rota-pill ${chave === 'cadastro' ? 'active' : ''}`;
+            link.innerHTML = `<span>${icones[chave] || '🔗'}</span> ${info.titulo}`;
+            bar.appendChild(link);
+        });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        renderizarBarraRotas();
+        renderizarItens();
+    });
+</script>
+</body>
+</html>

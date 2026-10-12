@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações do Sistema | Dom Gabriel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #0f0f12; color: white; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        
+        .config-card { background: #1a1a1e; border: 1px solid #29292e; border-radius: 16px; padding: 25px; width: 100%; max-width: 500px; margin: 0 auto; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+        h3 { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 20px; border-bottom: 1px solid #29292e; padding-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+        
+        label { display: block; font-size: 13px; color: #c4c4cc; margin-bottom: 8px; font-weight: 600; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { flex: 1; padding: 12px; border: 1px solid #29292e; background: #202024; color: white; border-radius: 8px; font-size: 15px; }
+        input:focus { border-color: #ff4b2b; outline: none; }
+        
+        .btn-config { padding: 12px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        .btn-salvar { background: #ff4b2b; color: white; }
+        .btn-salvar:hover { opacity: 0.9; }
+        .btn-adicionar { background: #28a745; color: white; }
+        .btn-adicionar:hover { background: #218838; }
+        
+        .info-box { background: #202024; padding: 15px; border-radius: 8px; border-left: 4px solid #ffb86c; font-size: 13px; color: #c4c4cc; line-height: 1.4; }
+
+        .nav-links { margin-top: 25px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        .btn-voltar { background: #202024; border: 1px solid #29292e; color: #8d8d99; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: bold; text-decoration: none; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-voltar:hover { color: white; border-color: #ff4b2b; background: #29292e; }
+    </style>
+</head>
+<body>
+
+    <div class="config-card">
+        <h3>⚙️ Configurações Gerais do Salão</h3>
+        
+        <div class="form-group">
+            <label for="qtdMesasInput">Quantidade Total de Mesas Ativas:</label>
+            <div class="input-group">
+                <input type="number" id="qtdMesasInput" min="1" placeholder="Ex: 15">
+                <button class="btn-config btn-salvar" onclick="salvarQuantidadeFixoMesas()">💾 Salvar</button>
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 25px; border-top: 1px solid #29292e; padding-top: 20px;">
+            <label>Gerenciamento Rápido de Expansão:</label>
+            <button class="btn-config btn-adicionar" id="btnCadastrarMesa" style="width: 100%;" onclick="cadastrarMesa()">➕ Cadastrar Mesa no Salão Agora (+1 Mesa)</button>
+        </div>
+
+        <div class="info-box" style="margin-top: 25px;">
+            💡 <strong>Dica do Sistema:</strong> Ao alterar a quantidade de mesas aqui, a tela de controle do salão e o painel de atendimento atualizarão os quadradinhos automaticamente.
+        </div>
+    </div>
+
+    <div class="nav-links">
+        <a href="admin_painel_mesas.html" class="btn-voltar">🍽️ Voltar ao Controle de Mesas</a>
+        <a href="admin_painel_geral.html" class="btn-voltar">🍔 Centro de Comando</a>
+        <a href="/" class="btn-voltar">🏠 Sistema Principal</a>
+    </div>
+
+<script>
+    window.addEventListener('DOMContentLoaded', () => {
+        const input = document.getElementById('qtdMesasInput');
+        const salvo = localStorage.getItem('totalMesasLayout') || 15;
+        if(input) input.value = salvo;
+    });
+
+    window.salvarQuantidadeFixoMesas = function() {
+        const input = document.getElementById('qtdMesasInput');
+        const qtd = parseInt(input.value);
+        if(!qtd || qtd < 1) {
+            alert('Por favor, informe uma quantidade válida de mesas.');
+            return;
+        }
+        localStorage.setItem('totalMesasLayout', qtd);
+        try { window.dispatchEvent(new Event('storage')); } catch (e) {}
+        alert(`Capacidade do salão atualizada para ${qtd} mesas!`);
+    };
+
+    window.cadastrarMesa = function() {
+        let totalAtual = parseInt(localStorage.getItem('totalMesasLayout') || 15);
+        totalAtual += 1;
+        localStorage.setItem('totalMesasLayout', totalAtual);
+        const input = document.getElementById('qtdMesasInput');
+        if(input) input.value = totalAtual;
+        try { window.dispatchEvent(new Event('storage')); } catch (e) {}
+        
+        alert(`🎉 Mesa ${totalAtual} cadastrada com sucesso! Nova capacidade: ${totalAtual} mesas.`);
+    };
+    window.adicionarUmaMesaMecanismo = window.cadastrarMesa;
+</script>
+</body>
+</html>

@@ -573,6 +573,25 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
     setModalMesaAberta(false);
   };
 
+  // Cadastrar nova mesa no salão físico
+  const handleCadastrarNovaMesa = () => {
+    const proximoNum = mesas.length > 0 ? Math.max(...mesas.map((m) => m.numero)) + 1 : 1;
+    const novaMesa: MesaItem = {
+      id: `m-${Date.now()}`,
+      numero: proximoNum,
+      status: 'livre',
+      itens: [],
+    };
+    const novasMesas = [...mesas, novaMesa];
+    setMesas(novasMesas);
+    try {
+      localStorage.setItem('domgabriel_mesas_salao', JSON.stringify(novasMesas));
+      localStorage.setItem('totalMesasLayout', String(novasMesas.length));
+      window.dispatchEvent(new Event('storage'));
+    } catch {}
+    alert(`🎉 Mesa ${proximoNum} cadastrada com sucesso no salão!`);
+  };
+
   // Fechar comanda da mesa
   const handleFecharMesa = (numero: number) => {
     if (confirm(`Deseja fechar a conta da Mesa ${numero} e liberar o salão?`)) {
@@ -1211,12 +1230,21 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
                     Gerencie comandas, consumo de lanches e fechamento de conta por mesa
                   </p>
                 </div>
-                <button
-                  onClick={() => setModalMesaAberta(true)}
-                  className="px-4 py-2.5 bg-gradient-to-r from-[#ff4b2b] to-[#ff416c] hover:opacity-90 text-white text-xs font-bold rounded-lg transition-all cursor-pointer shadow-md"
-                >
-                  + Abrir Nova Comanda / Mesa
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCadastrarNovaMesa}
+                    className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-all cursor-pointer shadow-md flex items-center gap-1.5"
+                    title="Cadastrar uma nova mesa no salão"
+                  >
+                    <span>➕ Cadastrar Mesa (+1)</span>
+                  </button>
+                  <button
+                    onClick={() => setModalMesaAberta(true)}
+                    className="px-4 py-2.5 bg-gradient-to-r from-[#ff4b2b] to-[#ff416c] hover:opacity-90 text-white text-xs font-bold rounded-lg transition-all cursor-pointer shadow-md"
+                  >
+                    + Abrir Nova Comanda / Mesa
+                  </button>
+                </div>
               </div>
 
               {/* Indicadores do Salão */}

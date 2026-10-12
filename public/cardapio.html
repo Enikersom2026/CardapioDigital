@@ -108,16 +108,74 @@
   <div id="barraFlutuanteSacola" class="fixed bottom-4 left-4 right-4 max-w-xl mx-auto bg-gradient-to-r from-zinc-950 via-zinc-900 to-black border border-cyan-400 p-3.5 rounded-2xl shadow-[0_10px_35px_rgba(0,0,0,0.8),0_0_20px_rgba(34,211,238,0.4)] flex items-center justify-between z-40 transition-transform duration-300 translate-y-24">
     <div class="flex items-center gap-3">
       <div class="w-10 h-10 rounded-xl bg-cyan-400 text-black flex items-center justify-center font-black text-sm shadow-[0_0_10px_#22d3ee]">
-        <span id="badgeQtdFooter">0</span>
+        <span id="badgeQtd">0</span>
+        <span id="badgeQtdFooter" class="hidden">0</span>
       </div>
       <div>
-        <p class="text-xs text-zinc-400">Total do Pedido</p>
-        <p id="txtTotalFooter" class="text-sm font-extrabold text-cyan-300 font-mono">R$ 0,00</p>
+        <p class="text-xs text-zinc-400">Total da Sacola</p>
+        <p id="precoSacola" class="text-sm font-extrabold text-cyan-300 font-mono">R$ 0,00</p>
+        <span id="txtTotalFooter" class="hidden">R$ 0,00</span>
       </div>
     </div>
-    <button onclick="abrirModalSacola()" class="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs transition-all shadow-[0_0_15px_rgba(34,211,238,0.6)] cursor-pointer flex items-center gap-1.5">
-      <span>Ver Sacola & Finalizar</span> ➔
-    </button>
+    <div class="flex items-center gap-2">
+      <a href="/carrinho.html" class="px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-cyan-300 font-extrabold text-xs border border-cyan-500/30 transition-all flex items-center gap-1">
+        🛒 Carrinho
+      </a>
+      <button onclick="abrirModalSacola()" class="px-4 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs transition-all shadow-[0_0_15px_rgba(34,211,238,0.6)] cursor-pointer flex items-center gap-1.5">
+        <span>Finalizar</span> ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE ADICIONAIS / PERSONALIZAR HAMBÚRGUER -->
+  <div id="modalAdicionais" class="fixed inset-0 bg-black/80 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#141418] border border-cyan-500/40 w-full max-w-md rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
+        <div>
+          <h2 id="modalAdicionaisTitulo" class="text-base font-extrabold text-white flex items-center gap-2">
+            🍔 Turbinar Hambúrguer
+          </h2>
+          <p id="modalAdicionaisSub" class="text-xs text-cyan-400 font-mono mt-0.5">Preço Base: R$ 0,00</p>
+        </div>
+        <button onclick="fecharModal()" class="text-zinc-400 hover:text-white text-2xl font-bold cursor-pointer p-1">&times;</button>
+      </div>
+
+      <!-- Resumo do Prato -->
+      <div class="flex items-center gap-3 p-3 bg-zinc-950 rounded-xl border border-zinc-800/80 mb-4">
+        <img id="modalAdicionaisImg" src="/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg" alt="Hambúrguer" class="w-16 h-16 rounded-lg object-cover border border-zinc-800">
+        <div class="flex-1 min-w-0">
+          <h4 id="modalAdicionaisNomePrato" class="text-sm font-extrabold text-white truncate">Nome do Prato</h4>
+          <p id="modalAdicionaisDesc" class="text-xs text-zinc-400 line-clamp-2 mt-0.5">Descrição dos ingredientes</p>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs font-black uppercase tracking-wider text-zinc-300">Escolha seus Adicionais Extras:</label>
+          <span class="text-[11px] text-cyan-400 font-bold">Opcional</span>
+        </div>
+        
+        <!-- Lista de Checkboxes de Adicionais com name="chkAdicional" e data-idx -->
+        <div id="listaCheckboxesAdicionais" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+          <!-- Gerado dinamicamente -->
+        </div>
+      </div>
+
+      <!-- Preço ao vivo com Adicionais somados -->
+      <div class="p-3 bg-zinc-950 rounded-xl border border-zinc-800 flex items-center justify-between mb-4">
+        <span class="text-xs font-bold text-zinc-300">Total deste Item:</span>
+        <span id="modalAdicionaisTotalVivo" class="text-base font-extrabold text-cyan-400 font-mono">R$ 0,00</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="fecharModal()" class="flex-1 py-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-bold text-xs rounded-xl border border-zinc-800 transition-colors">
+          Cancelar
+        </button>
+        <button type="button" onclick="confirmarEAdicionarNaSacola()" class="flex-1 py-3 bg-gradient-to-r from-cyan-400 to-teal-400 hover:from-cyan-300 hover:to-teal-300 text-black font-extrabold text-xs rounded-xl transition-all shadow-[0_0_15px_rgba(34,211,238,0.5)] cursor-pointer">
+          Adicionar à Sacola 🔥
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- MODAL DA SACOLA / CHECKOUT -->
@@ -256,6 +314,17 @@ try {
 }
 
 // ITENS DE FALLBACK INICIAIS
+const ADICIONAIS_PADRAO = [
+  { nome: 'Bacon Crocante Fatiado', preco: 5.00 },
+  { nome: 'Queijo Cheddar Melt Inglês', preco: 4.50 },
+  { nome: 'Hambúrguer Extra 160g', preco: 12.00 },
+  { nome: 'Cebola Caramelizada no Shoyu', preco: 4.00 },
+  { nome: 'Queijo Prato Derretido', preco: 4.00 },
+  { nome: 'Maionese Secreta Artesanal', preco: 3.00 },
+  { nome: 'Picles Artesanal Crocante', preco: 3.00 },
+  { nome: 'Ovo Caipira Estalado', preco: 3.00 }
+];
+
 const ITENS_PADRAO = [
   {
     id: 'item-1',
@@ -263,7 +332,8 @@ const ITENS_PADRAO = [
     preco: 36.90,
     categoria: 'Hambúrgueres',
     descricao: 'Blend bovino 160g no fogo, fatias generosas de bacon artesanal crocante defumado, queijo prato derretido e maionese secreta da casa.',
-    foto: '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg'
+    foto: '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg',
+    adicionais: [...ADICIONAIS_PADRAO]
   },
   {
     id: 'item-2',
@@ -271,7 +341,14 @@ const ITENS_PADRAO = [
     preco: 34.90,
     categoria: 'Hambúrgueres',
     descricao: '2x Smash burgers de 80g com crostinha crocante, cascata dupla de cheddar inglês derretido e cebola caramelizada.',
-    foto: '/src/assets/images/hero_burger_craft_1791212520486.jpg'
+    foto: '/src/assets/images/hero_burger_craft_1791212520486.jpg',
+    adicionais: [
+      { nome: 'Smash Extra 80g', preco: 9.00 },
+      { nome: 'Cascata de Cheddar Melt', preco: 5.50 },
+      { nome: 'Cebola Caramelizada Extra', preco: 4.00 },
+      { nome: 'Bacon Crocante Fatiado', preco: 5.00 },
+      { nome: 'Maionese Secreta Artesanal', preco: 3.00 }
+    ]
   },
   {
     id: 'item-3',
@@ -279,7 +356,8 @@ const ITENS_PADRAO = [
     preco: 49.90,
     categoria: 'Combos',
     descricao: '1 Burger Artesanal da casa, porção individual de batata rústica crocante com alecrim e 1 refrigerante lata trincando.',
-    foto: '/src/assets/images/hero_burger_craft_1791212520486.jpg'
+    foto: '/src/assets/images/hero_burger_craft_1791212520486.jpg',
+    adicionais: [...ADICIONAIS_PADRAO]
   },
   {
     id: 'item-4',
@@ -287,7 +365,12 @@ const ITENS_PADRAO = [
     preco: 24.90,
     categoria: 'Porções',
     descricao: 'Batatas rústicas cortadas à mão, fritas no ponto perfeito, temperadas com sal marinho, alecrim fresco e farofa de bacon.',
-    foto: '/src/assets/images/dish_batata_rustica_1791212543257.jpg'
+    foto: '/src/assets/images/dish_batata_rustica_1791212543257.jpg',
+    adicionais: [
+      { nome: 'Farofa Extra de Bacon', preco: 4.50 },
+      { nome: 'Cheddar Cremoso por Cima', preco: 5.00 },
+      { nome: 'Maionese da Casa Extra', preco: 3.00 }
+    ]
   },
   {
     id: 'item-5',
@@ -295,7 +378,8 @@ const ITENS_PADRAO = [
     preco: 14.90,
     categoria: 'Bebidas & Drinks',
     descricao: 'Xarope artesanal francês de maçã verde, água gaseificada premium, muito gelo e lâminas de limão siciliano.',
-    foto: '/src/assets/images/dish_artisan_drink_1791212555004.jpg'
+    foto: '/src/assets/images/dish_artisan_drink_1791212555004.jpg',
+    adicionais: []
   },
   {
     id: 'item-6',
@@ -303,9 +387,24 @@ const ITENS_PADRAO = [
     preco: 7.00,
     categoria: 'Bebidas & Drinks',
     descricao: 'Original ou Zero Açúcar bem gelada.',
-    foto: '/src/assets/images/dish_artisan_drink_1791212555004.jpg'
+    foto: '/src/assets/images/dish_artisan_drink_1791212555004.jpg',
+    adicionais: []
   }
 ];
+
+// Função auxiliar para normalizar adicionais
+function prepararAdicionais(adics, cat) {
+  if (Array.isArray(adics) && adics.length > 0) {
+    return adics.map(a => ({
+      nome: a.nome || a.name || 'Adicional',
+      preco: parseFloat(a.preco || a.price || 0)
+    }));
+  }
+  if (cat === 'Hambúrgueres' || cat === 'Combos') {
+    return [...ADICIONAIS_PADRAO];
+  }
+  return [];
+}
 
 // Carregar catálogo de produtos (sincronizado com os itens cadastrados no App)
 let cardapioItens = [...ITENS_PADRAO];
@@ -320,7 +419,8 @@ try {
         preco: Number(p.price) || 0,
         categoria: p.category,
         descricao: p.gourmetDescription || p.shortDescription || p.ingredients || '',
-        foto: p.image || '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg'
+        foto: p.image || '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg',
+        adicionais: prepararAdicionais(p.adicionais, p.category)
       }));
     }
   } else {
@@ -334,7 +434,8 @@ try {
           preco: parseFloat(p.preco) || 0,
           categoria: p.categoria || 'Hambúrgueres',
           descricao: p.descricao || '',
-          foto: '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg'
+          foto: '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg',
+          adicionais: prepararAdicionais(p.adicionais, p.categoria || 'Hambúrgueres')
         }));
       }
     }
@@ -346,7 +447,169 @@ try {
 // ESTADO DO CLIENTE E SACOLA
 let categoriaFiltro = 'Todos';
 let textoBusca = '';
+
+// Memória plana do OlaClick
+let carrinhoOla = [];
+try {
+  const salvoMeu = localStorage.getItem('meuCarrinho');
+  if (salvoMeu) {
+    const parsed = JSON.parse(salvoMeu);
+    if (Array.isArray(parsed)) carrinhoOla = parsed;
+  }
+} catch (e) {
+  carrinhoOla = [];
+}
+
 let sacola = [];
+try {
+  const salvoSacola = localStorage.getItem('dom_gabriel_sacola') || localStorage.getItem('carrinho_dom_gabriel');
+  if (salvoSacola) {
+    const parsed = JSON.parse(salvoSacola);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      sacola = parsed;
+    }
+  }
+} catch (e) {
+  sacola = [];
+}
+
+// Se não tinha sacola mas tinha carrinhoOla, reconstruir
+if (sacola.length === 0 && carrinhoOla.length > 0) {
+  carrinhoOla.forEach((it, idx) => {
+    sacola.push({
+      id: `ola-item-${idx}`,
+      nome: it.nome,
+      preco: parseFloat(it.preco),
+      quantidade: 1
+    });
+  });
+}
+
+// Prato atualmente aberto para personalização
+let pratoSelecionadoAtual = null;
+window.pratoSelecionadoAtual = null;
+
+// FECHAR MODAL DE ADICIONAIS
+window.fecharModal = function() {
+  const modal = document.getElementById('modalAdicionais');
+  if (modal) modal.classList.add('hidden');
+};
+
+// ABRIR MODAL PARA SELEÇÃO DE ADICIONAIS
+window.abrirModalAdicionais = function(id) {
+  const produto = cardapioItens.find(p => p.id === id);
+  if (!produto) return;
+
+  if (!produto.adicionais || produto.adicionais.length === 0) {
+    produto.adicionais = [...ADICIONAIS_PADRAO];
+  }
+
+  pratoSelecionadoAtual = produto;
+  window.pratoSelecionadoAtual = produto;
+
+  const modal = document.getElementById('modalAdicionais');
+  const nomePrato = document.getElementById('modalAdicionaisNomePrato');
+  const descPrato = document.getElementById('modalAdicionaisDesc');
+  const subPrato = document.getElementById('modalAdicionaisSub');
+  const imgPrato = document.getElementById('modalAdicionaisImg');
+  const container = document.getElementById('listaCheckboxesAdicionais');
+
+  if (nomePrato) nomePrato.innerText = produto.nome;
+  if (descPrato) descPrato.innerText = produto.descricao;
+  if (subPrato) subPrato.innerText = `Preço Base: R$ ${parseFloat(produto.preco).toFixed(2).replace('.', ',')}`;
+  if (imgPrato) imgPrato.src = produto.foto;
+
+  if (container) {
+    container.innerHTML = produto.adicionais.map((adic, idx) => {
+      const precoAdic = parseFloat(adic.preco);
+      return `
+        <label class="flex items-center justify-between p-2.5 bg-zinc-900 border border-zinc-800 hover:border-cyan-500/50 rounded-xl cursor-pointer transition-all">
+          <div class="flex items-center gap-3">
+            <input type="checkbox" name="chkAdicional" data-idx="${idx}" onchange="recalcularTotalVivoModal()" class="w-4 h-4 accent-cyan-400 rounded cursor-pointer">
+            <span class="text-xs font-bold text-zinc-200">${adic.nome}</span>
+          </div>
+          <span class="text-xs font-black text-cyan-400 font-mono">+ R$ ${precoAdic.toFixed(2).replace('.', ',')}</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  window.recalcularTotalVivoModal();
+
+  if (modal) modal.classList.remove('hidden');
+};
+
+window.recalcularTotalVivoModal = function() {
+  if (!pratoSelecionadoAtual) return;
+  let total = parseFloat(pratoSelecionadoAtual.preco);
+  const checkboxes = document.querySelectorAll('input[name="chkAdicional"]:checked');
+  checkboxes.forEach(chk => {
+    const idx = chk.getAttribute('data-idx');
+    const info = pratoSelecionadoAtual.adicionais[idx];
+    if (info) total += parseFloat(info.preco);
+  });
+  const elTotal = document.getElementById('modalAdicionaisTotalVivo');
+  if (elTotal) {
+    elTotal.innerText = `R$ ${total.toFixed(2).replace('.', ',')}`;
+  }
+};
+
+// JUNTA O HAMBÚRGUER + ADICIONAIS MARCADOS E SOMA OS VALORES CORRETAMENTE
+window.confirmarEAdicionarNaSacola = function() {
+    // 1. Pegamos o preço base do hambúrguer como um número decimal puro
+    let precoFinalItem = parseFloat(pratoSelecionadoAtual.preco); 
+    let nomesAdicionaisEscolhidos = [];
+
+    // 2. Buscamos todas as caixinhas de adicionais que o cliente marcou
+    const checkboxes = document.querySelectorAll('input[name="chkAdicional"]:checked');
+    
+    checkboxes.forEach(chk => {
+        const idx = chk.getAttribute('data-idx');
+        const infoAdicional = pratoSelecionadoAtual.adicionais[idx];
+        
+        // 🚨 AQUI ESTÁ A CORREÇÃO: Forçamos o valor do adicional a ser lido como número e somamos ao total do item
+        precoFinalItem += parseFloat(infoAdicional.preco);
+        
+        // Guardamos o texto do adicional para discriminar no cupom do WhatsApp/Cozinha
+        nomesAdicionaisEscolhidos.push(`+ ${infoAdicional.nome} (R$ ${parseFloat(infoAdicional.preco).toFixed(2).replace('.', ',')})`);
+    });
+
+    // 3. Formatamos o nome do hambúrguer detalhando o que ele colocou de extra
+    let nomeItemFormatado = pratoSelecionadoAtual.nome;
+    if(nomesAdicionaisEscolhidos.length > 0) {
+        nomeItemFormatado += ` \n   _${nomesAdicionaisEscolhidos.join('\n   ')}_`;
+    }
+
+    // 4. Salvamos o item com o preço TOTAL já somado (Burger + Adicionais) dentro da sacola
+    carrinhoOla.push({ 
+        nome: nomeItemFormatado, 
+        preco: parseFloat(precoFinalItem) // Salva o valor cheio com os adicionais embutidos
+    });
+    
+    // Grava a sacola atualizada na memória do navegador
+    localStorage.setItem('meuCarrinho', JSON.stringify(carrinhoOla));
+
+    // 5. Atualiza a barra de sacola preta inferior com o valor real somado
+    const elBadge = document.getElementById('badgeQtd');
+    if (elBadge) elBadge.innerText = carrinhoOla.length;
+    const totalSacola = carrinhoOla.reduce((sum, item) => sum + item.preco, 0);
+    const elPreco = document.getElementById('precoSacola');
+    if (elPreco) elPreco.innerText = `R$ ${totalSacola.toFixed(2).replace('.', ',')}`;
+
+    // Fecha a janelinha de adicionais
+    fecharModal();
+    alert("Hambúrguer turbinado adicionado à sacola! 🍔🔥");
+
+    // Sincroniza também com a estrutura interna sacola
+    sacola.push({
+      id: `custom-${Date.now()}`,
+      nome: nomeItemFormatado,
+      preco: parseFloat(precoFinalItem),
+      quantidade: 1
+    });
+    atualizarSacolaUI();
+    renderizarProdutos();
+};
 
 // Modo inicial: verifica se já tinha mesa salva
 let modoAtual = localStorage.getItem('modoPedido') || 'delivery';
@@ -413,30 +676,35 @@ function renderizarProdutos() {
   container.innerHTML = itensFiltrados.map(item => {
     const noCarrinho = sacola.find(s => s.id === item.id);
     const qtd = noCarrinho ? noCarrinho.quantidade : 0;
+    const aceitaCustomizacao = (item.categoria === 'Hambúrgueres' || item.categoria === 'Combos' || (item.adicionais && item.adicionais.length > 0));
 
     return `
       <div class="bg-zinc-950 border border-zinc-800/90 hover:border-cyan-500/50 rounded-2xl p-4 flex flex-row items-center gap-4 transition-all shadow-md">
-        <div class="w-24 h-24 rounded-xl overflow-hidden bg-black shrink-0 border border-zinc-800">
+        <div onclick="${aceitaCustomizacao ? `abrirModalAdicionais('${item.id}')` : `adicionarItem('${item.id}')`}" class="w-24 h-24 rounded-xl overflow-hidden bg-black shrink-0 border border-zinc-800 cursor-pointer hover:opacity-90 transition-opacity">
           <img src="${item.foto}" alt="${item.nome}" class="w-full h-full object-cover">
         </div>
         <div class="flex-1 min-w-0">
-          <h3 class="text-sm font-extrabold text-white leading-snug line-clamp-1">${item.nome}</h3>
+          <h3 onclick="${aceitaCustomizacao ? `abrirModalAdicionais('${item.id}')` : `adicionarItem('${item.id}')`}" class="text-sm font-extrabold text-white leading-snug line-clamp-1 cursor-pointer hover:text-cyan-300 transition-colors">${item.nome}</h3>
           <p class="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed">${item.descricao}</p>
           <div class="mt-2.5 flex items-center justify-between">
             <span class="text-sm font-black text-cyan-400 font-mono">R$ ${item.preco.toFixed(2).replace('.', ',')}</span>
             
             <div class="flex items-center gap-2">
-              ${qtd > 0 ? `
+              ${aceitaCustomizacao ? `
+                <button onclick="abrirModalAdicionais('${item.id}')" class="px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-teal-400 hover:from-cyan-300 hover:to-teal-300 text-black text-xs font-black transition-all shadow-[0_0_10px_rgba(34,211,238,0.4)] cursor-pointer flex items-center gap-1">
+                  🍔 Personalizar / Pedir
+                </button>
+              ` : (qtd > 0 ? `
                 <div class="flex items-center gap-2 bg-black border border-cyan-400 rounded-full px-2 py-1 shadow-[0_0_10px_rgba(34,211,238,0.5)]">
-                  <button onclick="alterarQtd('${item.id}', -1)" class="w-5 h-5 rounded-full bg-zinc-900 text-white flex items-center justify-center text-xs hover:bg-zinc-800">-</button>
+                  <button onclick="alterarQtd('${item.id}', -1)" class="w-5 h-5 rounded-full bg-zinc-900 text-white flex items-center justify-center text-xs hover:bg-zinc-800 cursor-pointer">-</button>
                   <span class="text-xs font-bold text-cyan-300 font-mono">${qtd}</span>
-                  <button onclick="alterarQtd('${item.id}', 1)" class="w-5 h-5 rounded-full bg-zinc-900 text-white flex items-center justify-center text-xs hover:bg-zinc-800">+</button>
+                  <button onclick="alterarQtd('${item.id}', 1)" class="w-5 h-5 rounded-full bg-zinc-900 text-white flex items-center justify-center text-xs hover:bg-zinc-800 cursor-pointer">+</button>
                 </div>
               ` : `
-                <button onclick="adicionarItem('${item.id}')" class="px-3.5 py-1.5 rounded-full bg-zinc-900 hover:bg-cyan-400 text-zinc-200 hover:text-black border border-cyan-500/40 text-xs font-bold transition-all shadow-sm">
+                <button onclick="adicionarItem('${item.id}')" class="px-3.5 py-1.5 rounded-full bg-zinc-900 hover:bg-cyan-400 text-zinc-200 hover:text-black border border-cyan-500/40 text-xs font-bold transition-all shadow-sm cursor-pointer">
                   + Adicionar
                 </button>
-              `}
+              `)}
             </div>
           </div>
         </div>
@@ -506,12 +774,16 @@ function atualizarSacolaUI() {
 
   const badgeTopo = document.getElementById('contagemSacolaTopo');
   const badgeFooter = document.getElementById('badgeQtdFooter');
+  const badgeQtd = document.getElementById('badgeQtd');
   const txtTotalFooter = document.getElementById('txtTotalFooter');
+  const precoSacola = document.getElementById('precoSacola');
   const barraFooter = document.getElementById('barraFlutuanteSacola');
 
   if (badgeTopo) badgeTopo.innerText = totalQtd;
   if (badgeFooter) badgeFooter.innerText = totalQtd;
+  if (badgeQtd) badgeQtd.innerText = totalQtd;
   if (txtTotalFooter) txtTotalFooter.innerText = `R$ ${totalValor.toFixed(2).replace('.', ',')}`;
+  if (precoSacola) precoSacola.innerText = `R$ ${totalValor.toFixed(2).replace('.', ',')}`;
 
   if (barraFooter) {
     if (totalQtd > 0) {
@@ -521,10 +793,21 @@ function atualizarSacolaUI() {
     }
   }
 
-  // Sincroniza com localStorage para a tela carrinho.html
+  // Sincroniza memória do carrinhoOla e localStorage
   try {
     localStorage.setItem('dom_gabriel_sacola', JSON.stringify(sacola));
     localStorage.setItem('carrinho_dom_gabriel', JSON.stringify(sacola));
+
+    carrinhoOla = [];
+    sacola.forEach(item => {
+      for (let i = 0; i < item.quantidade; i++) {
+        carrinhoOla.push({
+          nome: item.nome,
+          preco: parseFloat(item.preco)
+        });
+      }
+    });
+    localStorage.setItem('meuCarrinho', JSON.stringify(carrinhoOla));
   } catch (e) {
     // ignore
   }
@@ -543,15 +826,15 @@ function atualizarSacolaUI() {
     } else {
       containerItens.innerHTML = sacola.map(item => `
         <div class="flex items-center justify-between p-2.5 bg-zinc-900 rounded-xl border border-zinc-800 text-xs">
-          <div>
-            <p class="font-bold text-white">${item.nome}</p>
-            <p class="text-zinc-400 font-mono text-[11px]">${item.quantidade}x R$ ${item.preco.toFixed(2).replace('.', ',')}</p>
+          <div class="flex-1 pr-2">
+            <p class="font-bold text-white whitespace-pre-line">${item.nome}</p>
+            <p class="text-zinc-400 font-mono text-[11px] mt-0.5">${item.quantidade}x R$ ${item.preco.toFixed(2).replace('.', ',')}</p>
           </div>
           <div class="flex items-center gap-2">
             <span class="font-bold text-cyan-300 font-mono">R$ ${(item.quantidade * item.preco).toFixed(2).replace('.', ',')}</span>
             <div class="flex items-center gap-1.5 ml-2">
-              <button type="button" onclick="alterarQtd('${item.id}', -1)" class="w-5 h-5 rounded-md bg-zinc-800 text-white flex items-center justify-center">-</button>
-              <button type="button" onclick="alterarQtd('${item.id}', 1)" class="w-5 h-5 rounded-md bg-zinc-800 text-white flex items-center justify-center">+</button>
+              <button type="button" onclick="alterarQtd('${item.id}', -1)" class="w-5 h-5 rounded-md bg-zinc-800 text-white flex items-center justify-center cursor-pointer">-</button>
+              <button type="button" onclick="alterarQtd('${item.id}', 1)" class="w-5 h-5 rounded-md bg-zinc-800 text-white flex items-center justify-center cursor-pointer">+</button>
             </div>
           </div>
         </div>

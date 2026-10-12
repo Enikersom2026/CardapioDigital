@@ -232,9 +232,18 @@ export const EntregadorPanel: React.FC<EntregadorPanelProps> = ({
       <header className="sticky top-0 z-40 bg-[#1a1a1e] border-b border-[#29292e] px-4 py-3 shadow-md">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-black border border-emerald-500/40 flex items-center justify-center text-xl shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-              🛵
-            </div>
+            <img
+              src="/src/assets/images/entregador_scooter_red_1791801019548.jpg"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.src.includes('/entregador_scooter_red.jpg')) {
+                  target.src = '/entregador_scooter_red.jpg';
+                }
+              }}
+              referrerPolicy="no-referrer"
+              className="w-11 h-11 object-cover rounded-xl border-2 border-red-500/70 p-0.5 bg-red-950/40 shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+              alt="Entregador Dom Gabriel"
+            />
             <div>
               <div className="flex items-center gap-1.5">
                 <h1 className="text-sm sm:text-base font-bold text-white tracking-tight">

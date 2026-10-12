@@ -6,3 +6,12 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Netlify
+.netlify/
+
+# Caches & IDE
+.vscode/
+.idea/
+*.tsbuildinfo
+server.js

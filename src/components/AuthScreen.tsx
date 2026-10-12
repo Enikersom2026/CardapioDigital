@@ -439,17 +439,40 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         {/* Header */}
         <div className="text-center mb-6">
           <div className="relative mx-auto mb-3 flex items-center justify-center">
-            {modo === 'cadastro_entregador' ? (
-              <div className="w-20 h-20 rounded-2xl bg-emerald-950/80 border border-emerald-500/50 flex items-center justify-center text-4xl shadow-[0_0_20px_rgba(16,185,129,0.35)]">
-                🛵
-              </div>
-            ) : (
-              <img
-                src="/src/assets/images/emblema_dom_gabriel.png"
-                className="w-20 h-20 object-contain rounded-full drop-shadow-[0_0_20px_rgba(255,75,43,0.45)]"
-                alt="Dom Gabriel Hamburgueria"
-              />
-            )}
+            <div className="relative">
+              {modo === 'cadastro_entregador' ? (
+                <div className="relative group flex flex-col items-center">
+                  <img
+                    src="/src/assets/images/entregador_scooter_red_1791801019548.jpg"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.includes('/entregador_scooter_red.jpg')) {
+                        target.src = '/entregador_scooter_red.jpg';
+                      }
+                    }}
+                    referrerPolicy="no-referrer"
+                    className="w-24 h-24 object-cover rounded-2xl drop-shadow-[0_0_25px_rgba(239,68,68,0.55)] border-2 border-red-500/80 bg-red-950/40 p-1 shadow-2xl transition-transform hover:scale-105"
+                    alt="Entregador Dom Gabriel"
+                  />
+                  <span className="absolute -bottom-2 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-lg border border-red-300 uppercase tracking-wider flex items-center gap-1">
+                    <span>🛵</span> Entregas
+                  </span>
+                </div>
+              ) : (
+                <img
+                  src="/src/assets/images/emblema_dom_gabriel.png"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (!target.src.includes('/emblema_dom_gabriel.png')) {
+                      target.src = '/emblema_dom_gabriel.png';
+                    }
+                  }}
+                  referrerPolicy="no-referrer"
+                  className="w-20 h-20 object-contain rounded-full drop-shadow-[0_0_20px_rgba(255,75,43,0.45)]"
+                  alt="Dom Gabriel Hamburgueria"
+                />
+              )}
+            </div>
           </div>
 
           <h2 className="text-2xl font-bold text-white tracking-tight">

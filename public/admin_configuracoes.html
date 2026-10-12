@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações de Hardware e Salão | Dom Gabriel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #0f0f12; color: white; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+        
+        header { width: 100%; max-width: 680px; text-align: center; border-bottom: 1px solid #29292e; padding-bottom: 20px; margin-bottom: 25px; }
+        header h1 { font-size: 22px; font-weight: 800; color: #ff4b2b; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        header p { font-size: 13px; color: #8d8d99; margin-top: 5px; }
+
+        .nav-rotas-bar { width: 100%; max-width: 680px; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 15px; margin-bottom: 20px; scrollbar-width: none; }
+        .nav-rotas-bar::-webkit-scrollbar { display: none; }
+        .rota-pill { background: #1a1a1e; border: 1px solid #29292e; color: #c4c4cc; padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .rota-pill:hover { border-color: #ff4b2b; color: white; background: #202024; }
+        .rota-pill.active { background: #ff4b2b; color: white; border-color: #ff4b2b; box-shadow: 0 4px 12px rgba(255,75,43,0.3); }
+
+        .container-configs { width: 100%; max-width: 680px; display: flex; flex-direction: column; gap: 20px; }
+
+        .config-card { background: #1a1a1e; border: 1px solid #29292e; border-radius: 16px; padding: 25px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+        h3 { font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 18px; border-bottom: 1px solid #29292e; padding-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+        
+        label { display: block; font-size: 13px; color: #c4c4cc; margin-bottom: 8px; font-weight: 600; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        input, select { flex: 1; padding: 12px; border: 1px solid #29292e; background: #202024; color: white; border-radius: 8px; font-size: 14px; }
+        input:focus, select:focus { border-color: #ff4b2b; outline: none; }
+        
+        .btn-config { padding: 12px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        .btn-salvar { background: #ff4b2b; color: white; }
+        .btn-salvar:hover { opacity: 0.9; }
+        .btn-adicionar { background: #28a745; color: white; }
+        .btn-adicionar:hover { background: #218838; }
+        
+        .info-box { background: #202024; padding: 14px; border-radius: 8px; border-left: 4px solid #ffb86c; font-size: 13px; color: #c4c4cc; line-height: 1.4; margin-top: 15px; }
+
+        /* Hardware Switch & Grid */
+        .hardware-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 15px; }
+        @media (max-width: 580px) { .hardware-grid { grid-template-columns: 1fr; } }
+        
+        .hardware-item { background: #202024; border: 1px solid #29292e; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+        .hardware-header { display: flex; justify-content: space-between; align-items: center; }
+        .hardware-title { font-size: 13px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 6px; }
+        .hardware-badge { font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: bold; }
+        .badge-pronto { background: rgba(40,167,69,0.2); color: #28a745; }
+        .badge-aviso { background: rgba(255,184,108,0.2); color: #ffb86c; }
+
+        .btn-hardware { width: 100%; padding: 11px; border: 1px solid #3e3e46; background: #1a1a1e; color: #c4c4cc; font-size: 12px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-hardware:hover { background: #29292e; color: #fff; border-color: #ff4b2b; }
+        .btn-hardware.destaque { background: #2563eb; color: white; border-color: #3b82f6; }
+        .btn-hardware.destaque:hover { background: #1d4ed8; }
+
+        .footer-nav { margin-top: 25px; margin-bottom: 30px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        .btn-voltar { background: #202024; border: 1px solid #29292e; color: #8d8d99; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: bold; text-decoration: none; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-voltar:hover { color: white; border-color: #ff4b2b; background: #29292e; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>⚙️ Configurações de Hardware e Salão</h1>
+        <p>Centro de Controle Técnico • Dom Gabriel Hamburgueria</p>
+    </header>
+
+    <!-- Barra de Atalho com o Objeto de Rotas -->
+    <nav class="nav-rotas-bar" id="barraRotasNav">
+        <!-- Populado dinamicamente pelo objeto rotas -->
+    </nav>
+
+    <div class="container-configs">
+        <!-- 1. GESTÃO DO SALÃO FÍSICO -->
+        <div class="config-card">
+            <h3>🍽️ Configurações Gerais do Salão</h3>
+            
+            <div class="form-group">
+                <label for="qtdMesasInput">Quantidade Total de Mesas Ativas no Salão:</label>
+                <div class="input-group">
+                    <input type="number" id="qtdMesasInput" min="1" placeholder="Ex: 15">
+                    <button class="btn-config btn-salvar" onclick="salvarQuantidadeFixoMesas()">💾 Salvar</button>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px; border-top: 1px solid #29292e; padding-top: 18px;">
+                <label>Gerenciamento Rápido de Expansão:</label>
+                <button class="btn-config btn-adicionar" id="btnCadastrarMesa" style="width: 100%;" onclick="cadastrarMesa()">➕ Cadastrar Mesa no Salão (+1 Mesa)</button>
+            </div>
+
+            <div class="info-box">
+                💡 <strong>Dica do Sistema:</strong> Ao alterar a quantidade de mesas aqui, a tela de controle do salão (`admin_painel_mesas.html`) e o painel de atendimento atualizarão os quadradinhos automaticamente em tempo real.
+            </div>
+        </div>
+
+        <!-- 2. GESTÃO DE HARDWARE (IMPRESSORAS TÉRMICAS & ÁUDIO) -->
+        <div class="config-card">
+            <h3>🖨️ Hardware & Dispositivos de Produção</h3>
+            
+            <div class="hardware-grid">
+                <!-- Impressora Térmica USB/Serial -->
+                <div class="hardware-item">
+                    <div class="hardware-header">
+                        <span class="hardware-title">🔌 Impressora USB (ESC/POS)</span>
+                        <span class="hardware-badge badge-pronto" id="statusUsbBadge">80mm / 58mm</span>
+                    </div>
+                    <label style="margin: 0; font-size: 11px;">Largura do Papel:</label>
+                    <select id="larguraPapelSelect" onchange="salvarConfigHardware()">
+                        <option value="80">80mm (Padrão Chapa / Balcão)</option>
+                        <option value="58">58mm (Portátil / Motoboy)</option>
+                    </select>
+                    <button type="button" class="btn-hardware" onclick="testarConexaoUsb()">
+                        <span>🔌 Parear Impressora USB</span>
+                    </button>
+                </div>
+
+                <!-- Bluetooth Sem Fio -->
+                <div class="hardware-item">
+                    <div class="hardware-header">
+                        <span class="hardware-title">📱 Bluetooth Sem Fio</span>
+                        <span class="hardware-badge badge-aviso" id="statusBtBadge">Web Bluetooth</span>
+                    </div>
+                    <label style="margin: 0; font-size: 11px;">Alerta Sonoro de Pedidos:</label>
+                    <select id="somPedidoSelect" onchange="salvarConfigHardware()">
+                        <option value="ativado">🔔 Ativado (Beep Triplo)</option>
+                        <option value="desativado">🔕 Mudo / Apenas Visual</option>
+                    </select>
+                    <button type="button" class="btn-hardware" onclick="testarSomCampainha()">
+                        <span>🔊 Testar Alerta Sonoro</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 15px; border-top: 1px solid #29292e; padding-top: 16px;">
+                <label>Vias de Impressão na Cozinha:</label>
+                <div class="input-group">
+                    <select id="viasImpressaoSelect" onchange="salvarConfigHardware()">
+                        <option value="1">1 Via (Apenas Chapa)</option>
+                        <option value="2">2 Vias (Chapa + Embalagem / Expedição)</option>
+                        <option value="3">3 Vias (Chapa + Expedição + Garçom / Caixa)</option>
+                    </select>
+                    <button class="btn-config btn-salvar" onclick="salvarConfigHardware(true)">💾 Salvar Hardware</button>
+                </div>
+            </div>
+
+            <div class="info-box">
+                ⚡ <strong>Compatibilidade Nativa:</strong> Suporta impressoras EPSON, Elgin, Bematech, Daruma e mini-impressoras térmicas Bluetooth compatíveis com comandos ESC/POS.
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-nav">
+        <a href="admin_painel_geral.html" class="btn-voltar">🍔 Centro de Comando</a>
+        <a href="admin_painel_mesas.html" class="btn-voltar">🍽️ Gerenciador de Mesas</a>
+        <a href="admin_painel_logistica.html" class="btn-voltar">🛵 Logística Delivery</a>
+        <a href="admin_dashboard.html" class="btn-voltar">📊 Visão Geral</a>
+        <a href="/" class="btn-voltar">🏠 Sistema Principal</a>
+    </div>
+
+<script>
+    // 🚨 DEFINIÇÃO OFICIAL DAS ROTAS DO DOM GABRIEL
+    const rotas = {
+        dashboard: { url: 'admin_dashboard.html', titulo: 'Visão Geral do Negócio' },
+        logistica: { url: 'admin_painel_logistica.html', titulo: 'Monitor de Logística & Motoboys' },
+        mesas:     { url: 'admin_painel_mesas.html', titulo: 'Gerenciador do Salão Físico' },
+        cadastro:  { url: 'admin_cadastro.html', titulo: 'Cardápio Inteligente com IA' },
+        config:    { url: 'admin_configuracoes.html', titulo: 'Configurações de Hardware e Salão' } // 🚨 NOVA ROTA AQUI!
+    };
+    window.rotas = rotas;
+
+    // Renderiza a barra de navegação superior com as rotas
+    function renderizarBarraRotas() {
+        const bar = document.getElementById('barraRotasNav');
+        if (!bar) return;
+        bar.innerHTML = '';
+
+        const icones = {
+            dashboard: '📊',
+            logistica: '🛵',
+            mesas: '🍽️',
+            cadastro: '🍔',
+            config: '⚙️'
+        };
+
+        Object.entries(rotas).forEach(([chave, info]) => {
+            const link = document.createElement('a');
+            link.href = info.url;
+            link.className = `rota-pill ${chave === 'config' ? 'active' : ''}`;
+            link.innerHTML = `<span>${icones[chave] || '🔗'}</span> ${info.titulo}`;
+            bar.appendChild(link);
+        });
+    }
+
+    // Inicialização da Página
+    window.addEventListener('DOMContentLoaded', () => {
+        renderizarBarraRotas();
+        
+        // Carrega configurações de salão
+        const inputMesas = document.getElementById('qtdMesasInput');
+        const salvoMesas = localStorage.getItem('totalMesasLayout') || 15;
+        if(inputMesas) inputMesas.value = salvoMesas;
+
+        // Carrega configurações de hardware
+        const largura = localStorage.getItem('domgabriel_papel_largura') || '80';
+        const som = localStorage.getItem('domgabriel_som_pedidos') || 'ativado';
+        const vias = localStorage.getItem('domgabriel_vias_impressao') || '2';
+
+        if(document.getElementById('larguraPapelSelect')) document.getElementById('larguraPapelSelect').value = largura;
+        if(document.getElementById('somPedidoSelect')) document.getElementById('somPedidoSelect').value = som;
+        if(document.getElementById('viasImpressaoSelect')) document.getElementById('viasImpressaoSelect').value = vias;
+    });
+
+    // Salvar quantidade de mesas
+    window.salvarQuantidadeFixoMesas = function() {
+        const input = document.getElementById('qtdMesasInput');
+        const qtd = parseInt(input.value);
+        if(!qtd || qtd < 1) {
+            alert('Por favor, informe uma quantidade válida de mesas.');
+            return;
+        }
+        localStorage.setItem('totalMesasLayout', qtd);
+        try { window.dispatchEvent(new Event('storage')); } catch (e) {}
+        alert(`✅ Capacidade do salão atualizada para ${qtd} mesas!`);
+    };
+
+    // Cadastrar / Adicionar +1 mesa
+    window.cadastrarMesa = function() {
+        let totalAtual = parseInt(localStorage.getItem('totalMesasLayout') || 15);
+        totalAtual += 1;
+        localStorage.setItem('totalMesasLayout', totalAtual);
+        const input = document.getElementById('qtdMesasInput');
+        if(input) input.value = totalAtual;
+        try { window.dispatchEvent(new Event('storage')); } catch (e) {}
+        
+        alert(`🎉 Mesa ${totalAtual} cadastrada com sucesso! Nova capacidade: ${totalAtual} mesas.`);
+    };
+    window.adicionarUmaMesaMecanismo = window.cadastrarMesa;
+
+    // Salvar configurações de hardware
+    window.salvarConfigHardware = function(notificar = false) {
+        const largura = document.getElementById('larguraPapelSelect').value;
+        const som = document.getElementById('somPedidoSelect').value;
+        const vias = document.getElementById('viasImpressaoSelect').value;
+
+        localStorage.setItem('domgabriel_papel_largura', largura);
+        localStorage.setItem('domgabriel_som_pedidos', som);
+        localStorage.setItem('domgabriel_vias_impressao', vias);
+
+        if (notificar) {
+            alert('✅ Parâmetros de Hardware gravados com sucesso!');
+        }
+    };
+
+    // Testar som de campainha
+    window.testarSomCampainha = function() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const now = ctx.currentTime;
+            
+            // Beep 1
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            osc1.type = 'triangle';
+            osc1.frequency.setValueAtTime(880, now);
+            gain1.gain.setValueAtTime(0.3, now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.15);
+
+            // Beep 2
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(1174.66, now + 0.18);
+            gain2.gain.setValueAtTime(0.4, now + 0.18);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.start(now + 0.18);
+            osc2.stop(now + 0.38);
+
+            alert('🔔 Teste de áudio disparado com sucesso!');
+        } catch(e) {
+            alert('Alerta sonoro disponível quando ativado pelo navegador.');
+        }
+    };
+
+    // Teste Pareamento USB Web Serial
+    window.testarConexaoUsb = async function() {
+        if (!navigator.serial) {
+            alert('A API Web Serial está pronta e homologada para Google Chrome / Edge no desktop.');
+            return;
+        }
+        try {
+            const port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 9600 });
+            alert('✅ Impressora USB Serial conectada e pronta para imprimir!');
+        } catch (e) {
+            if (e.name !== 'NotFoundError') {
+                console.log('Serial info:', e);
+            }
+        }
+    };
+</script>
+</body>
+</html>
