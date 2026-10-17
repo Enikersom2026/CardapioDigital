@@ -1,441 +1,250 @@
-import React, { useState } from 'react';
-import { Printer, Copy, Check, QrCode, Share2, MessageCircle, FileText, Receipt, Sliders, Cpu } from 'lucide-react';
+import React, { useState, useEffect, useId } from 'react';
+import QRCode from 'qrcode';
+import { Printer, RefreshCw, Layers } from 'lucide-react';
 import { MenuItem, RestaurantConfig } from '../types';
-import { testarImpressoraTermica } from '../utils/thermalPrinter';
 
 interface PrintAndExportProps {
   restaurant: RestaurantConfig;
   items: MenuItem[];
 }
 
-export const PrintAndExport: React.FC<PrintAndExportProps> = ({
-  restaurant,
-  items,
-}) => {
-  const [copiedMenu, setCopiedMenu] = useState(false);
-  const [formatoImpressao, setFormatoImpressao] = useState<'58mm' | 'a4'>('58mm');
-  const [statusTesteTermico, setStatusTesteTermico] = useState<string | null>(null);
-  const [testandoSerial, setTestandoSerial] = useState(false);
-
-  const handleTestarHardwareTermico = async () => {
-    setTestandoSerial(true);
-    setStatusTesteTermico(null);
+export const PrintAndExport: React.FC<PrintAndExportProps> = ({ restaurant }) => {
+  const [totalMesas, setTotalMesas] = useState<number>(() => {
     try {
-      const res = await testarImpressoraTermica();
-      setStatusTesteTermico(res.mensagem);
-    } catch (err: any) {
-      setStatusTesteTermico(err?.message || 'Falha na conexão com a impressora.');
-    } finally {
-      setTestandoSerial(false);
+      return parseInt(localStorage.getItem('totalMesasLayout') || '15', 10) || 15;
+    } catch {
+      return 15;
+    }
+  });
+
+  const [urlBase, setUrlBase] = useState<string>(() => {
+    try {
+      const origin = window.location.origin;
+      return `${origin}/cardapio.html`;
+    } catch {
+      return 'https://web.app/cardapio.html';
+    }
+  });
+
+  const [qrImgs, setQrImgs] = useState<Record<number, string>>({});
+  const [gerando, setGerando] = useState(false);
+
+  // Gera os QR Codes para cada mesa com alta definição
+  useEffect(() => {
+    let cancelado = false;
+    setGerando(true);
+
+    const gerar = async () => {
+      const urls: Record<number, string> = {};
+      const baseLimpa = urlBase.trim() || `${window.location.origin}/cardapio.html`;
+      const sep = baseLimpa.includes('?') ? '&' : '?';
+
+      for (let i = 1; i <= totalMesas; i++) {
+        const linkMesa = `${baseLimpa}${sep}mesa=${i}`;
+        try {
+          const dataUrl = await QRCode.toDataURL(linkMesa, {
+            width: 220,
+            margin: 1,
+            color: {
+              dark: '#000000',
+              light: '#ffffff',
+            },
+            errorCorrectionLevel: 'H',
+          });
+          urls[i] = dataUrl;
+        } catch (e) {
+          console.error(`Erro ao gerar QR mesa ${i}:`, e);
+          // Fallback para api pública de qrcode se falhar
+          urls[i] = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(linkMesa)}`;
+        }
+      }
+
+      if (!cancelado) {
+        setQrImgs(urls);
+        setGerando(false);
+      }
+    };
+
+    gerar();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [urlBase, totalMesas]);
+
+  const handleTotalMesasChange = (novoValor: number) => {
+    const val = Math.max(1, Math.min(60, novoValor));
+    setTotalMesas(val);
+    try {
+      localStorage.setItem('totalMesasLayout', String(val));
+    } catch {
+      // ignore
     }
   };
 
-  const handlePrint = (formato?: '58mm' | 'a4') => {
-    const chosenFormat = formato || formatoImpressao;
-    document.body.classList.remove('print-mode-58mm', 'print-mode-a4');
-    document.body.classList.add(`print-mode-${chosenFormat}`);
+  const handleImprimir = () => {
     window.print();
   };
 
-  const generateWhatsappMenuText = () => {
-    let text = `📜 *CARDÁPIO COMPLETO - ${restaurant.name.toUpperCase()}*\n`;
-    text += `_${restaurant.tagline}_\n`;
-    text += `📍 ${restaurant.address}\n\n`;
-
-    const categories = Array.from(new Set(items.map((i) => i.category)));
-
-    categories.forEach((cat) => {
-      text += `━━━━━━━━━━━━━━━━━━━\n*${cat.toUpperCase()}*\n━━━━━━━━━━━━━━━━━━━\n`;
-      const catItems = items.filter((i) => i.category === cat && i.available);
-      catItems.forEach((item) => {
-        text += `\n*${item.name}* - R$ ${item.price.toFixed(2)}\n`;
-        text += `${item.shortDescription || item.ingredients}\n`;
-      });
-      text += `\n`;
-    });
-
-    text += `\n🛵 Pedidos via WhatsApp: https://wa.me/${restaurant.whatsapp.replace(/\D/g, '')}\n`;
-    text += `Tempo médio de entrega: ${restaurant.deliveryTime}`;
-    return text;
-  };
-
-  const handleCopyMenu = () => {
-    const text = generateWhatsappMenuText();
-    navigator.clipboard.writeText(text);
-    setCopiedMenu(true);
-    setTimeout(() => setCopiedMenu(false), 2500);
-  };
-
-  const categories = Array.from(new Set(items.map((i) => i.category)));
-  const dataAtual = new Date().toLocaleDateString('pt-BR');
-  const horaAtual = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-8 text-zinc-100 text-left">
-      {/* Top Banner (Hidden in print) */}
-      <div className="no-print mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="w-full min-h-screen bg-[#0f0f12] text-white p-4 sm:p-6 flex flex-col items-center">
+      {/* Estilos específicos para impressão perfeita em grade de 3 colunas */}
+      <style>{`
+        @media print {
+          .no-print-central { display: none !important; }
+          body, html, #root { background: #ffffff !important; color: #000000 !important; padding: 0 !important; margin: 0 !important; }
+          .grid-tags-print {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 16px !important;
+            width: 100% !important;
+            padding: 10px !important;
+          }
+          .card-tag-print {
+            background: #ffffff !important;
+            color: #111111 !important;
+            box-shadow: none !important;
+            border: 2px dashed #111111 !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            padding: 20px 14px !important;
+          }
+        }
+      `}</style>
+
+      {/* Header Central de Impressão de QR Codes */}
+      <header className="no-print-central w-full max-w-4xl border-b border-[#29292e] pb-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase tracking-widest mb-1.5 font-mono">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" />
-            <span>Configuração de Impressão Térmica</span>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <h1 className="text-xl sm:text-2xl font-black text-[#ff4b2b] tracking-tight">
+              🖨️ Central de Impressão de QR Codes
+            </h1>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight font-display">
-            Impressão de Cardápio 🖨️
-          </h1>
-          <p className="text-sm text-zinc-400 mt-1">
-            Configurado especialmente para <strong className="text-cyan-400 font-mono">Impressora Térmica de 58mm</strong> (bobina de cupom) e formato A4.
+          <p className="text-xs text-zinc-400 mt-1">
+            Geração de displays de acrílico e adesivos de mesa para o cardápio digital de{' '}
+            <strong className="text-white">{restaurant.name || 'Dom Gabriel'}</strong>.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={handleCopyMenu}
-            className="flex items-center gap-2 px-4 py-2.5 bg-black hover:bg-zinc-900 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.2)]"
-          >
-            {copiedMenu ? (
-              <>
-                <Check className="w-4 h-4 text-cyan-400" />
-                <span className="text-cyan-300">Copiado p/ WhatsApp!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4" />
-                <span>Copiar p/ WhatsApp</span>
-              </>
-            )}
-          </button>
+        <button
+          type="button"
+          onClick={handleImprimir}
+          className="flex items-center justify-center gap-2 bg-[#00b37e] hover:bg-[#008f64] text-white px-6 py-3 rounded-xl font-extrabold text-sm shadow-[0_0_20px_rgba(0,179,126,0.5)] cursor-pointer transition-all shrink-0 active:scale-95"
+        >
+          <Printer className="w-4 h-4" />
+          <span>Mandar para Impressora</span>
+        </button>
+      </header>
 
-          <button
-            onClick={() => handlePrint(formatoImpressao)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-cyan-400 hover:bg-cyan-300 text-black rounded-xl text-xs sm:text-sm font-black shadow-[0_0_20px_rgba(34,211,238,0.7)] hover:shadow-[0_0_30px_rgba(34,211,238,0.95)] border border-cyan-300 transition-all cursor-pointer"
-          >
-            <Printer className="w-4 h-4 text-black" />
-            <span>
-              {formatoImpressao === '58mm'
-                ? 'Imprimir Cupom Térmico (58mm)'
-                : 'Imprimir Folha A4'}
+      {/* Painel de Configurações das Tags */}
+      <div className="no-print-central bg-[#1a1a1e] border border-[#29292e] p-5 rounded-2xl w-full max-w-4xl mb-8 space-y-4 shadow-xl">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Input da URL do Cardápio */}
+          <div className="md:col-span-2">
+            <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+              Link do seu Cardápio (URL do Firebase Hosting / Web App):
+            </label>
+            <input
+              type="text"
+              value={urlBase}
+              onChange={(e) => setUrlBase(e.target.value)}
+              placeholder="https://sua-empresa.web.app/cardapio.html"
+              className="w-full px-4 py-2.5 border border-[#29292e] bg-[#202024] text-white rounded-xl text-xs font-mono focus:outline-hidden focus:border-[#ff4b2b] transition-colors"
+            />
+            <span className="text-[11px] text-zinc-500 mt-1 block">
+              Cada QR Code adicionará automaticamente <code className="text-cyan-400">?mesa=X</code> ao final para abrir o pedido direto na mesa correspondente.
             </span>
-          </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={handleTestarHardwareTermico}
-            disabled={testandoSerial}
-            className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-[0_0_15px_rgba(234,88,12,0.4)] transition-all cursor-pointer disabled:opacity-50"
-            title="Enviar comando direto ESC/POS para a impressora USB/Serial 58mm/80mm"
-          >
-            <Cpu className="w-4 h-4" />
-            <span>{testandoSerial ? 'Conectando...' : 'Testar Térmica USB'}</span>
-          </button>
+          {/* Quantidade de Mesas */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-300 mb-1.5 flex items-center justify-between">
+              <span>Quantidade de Mesas:</span>
+              <span className="text-[#ff4b2b] font-mono font-extrabold">{totalMesas} mesas</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleTotalMesasChange(totalMesas - 1)}
+                className="w-10 h-10 rounded-xl bg-[#202024] border border-[#29292e] text-zinc-200 hover:text-white hover:border-zinc-600 font-bold text-base flex items-center justify-center cursor-pointer transition-colors"
+              >
+                -
+              </button>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={totalMesas}
+                onChange={(e) => handleTotalMesasChange(parseInt(e.target.value, 10) || 1)}
+                className="w-full text-center py-2 bg-[#202024] border border-[#29292e] rounded-xl text-white font-mono font-bold text-sm focus:outline-hidden focus:border-[#ff4b2b]"
+              />
+              <button
+                type="button"
+                onClick={() => handleTotalMesasChange(totalMesas + 1)}
+                className="w-10 h-10 rounded-xl bg-[#202024] border border-[#29292e] text-zinc-200 hover:text-white hover:border-zinc-600 font-bold text-base flex items-center justify-center cursor-pointer transition-colors"
+              >
+                +
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {statusTesteTermico && (
-        <div className="no-print mb-6 p-3 rounded-xl bg-orange-950/70 border border-orange-500/50 text-orange-200 text-xs flex items-center justify-between">
+        <div className="flex items-center justify-between pt-2 border-t border-[#29292e]/60 text-xs text-zinc-400">
           <div className="flex items-center gap-2">
-            <Printer className="w-4 h-4 text-orange-400" />
-            <span>{statusTesteTermico}</span>
+            <Layers className="w-4 h-4 text-cyan-400" />
+            <span>Exibindo <strong>{totalMesas} tags</strong> prontas para impressão e recorte.</span>
           </div>
-          <button
-            onClick={() => setStatusTesteTermico(null)}
-            className="text-orange-400 hover:text-white font-bold ml-2"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Seletor de Formato de Impressora (58mm vs A4) */}
-      <div className="no-print bg-zinc-950 p-4 rounded-2xl border border-cyan-500/35 shadow-[0_0_20px_rgba(6,182,212,0.15)] mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Receipt className="w-5 h-5 text-cyan-400" />
-          <div>
-            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-cyan-400">
-              Formato Selecionado para a Impressora
-            </h2>
-            <p className="text-xs text-zinc-400">
-              Escolha o tipo de papel e impressora conectado ao seu caixa ou computador.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setFormatoImpressao('58mm')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-              formatoImpressao === '58mm'
-                ? 'bg-cyan-400 text-black shadow-[0_0_15px_rgba(34,211,238,0.7)] border border-cyan-300'
-                : 'bg-black text-zinc-400 hover:text-white border border-zinc-800'
-            }`}
-          >
-            <Receipt className="w-4 h-4" />
-            <span>Impressora Térmica 58mm (Bobina)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setFormatoImpressao('a4')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              formatoImpressao === 'a4'
-                ? 'bg-cyan-400 text-black shadow-[0_0_15px_rgba(34,211,238,0.7)] border border-cyan-300'
-                : 'bg-black text-zinc-400 hover:text-white border border-zinc-800'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Papel A4 / PDF Completo</span>
-          </button>
-        </div>
-      </div>
-
-      {/* QR Code & Share Cards (Hidden in print) */}
-      <div className="no-print grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-zinc-950 p-6 rounded-2xl border border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)] flex items-center gap-5">
-          <div className="w-24 h-24 bg-black border border-cyan-500/40 text-cyan-400 p-2 rounded-xl shrink-0 flex flex-col items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.2)]">
-            <svg viewBox="0 0 100 100" className="w-full h-full fill-current text-cyan-400">
-              <rect x="0" y="0" width="30" height="30" fill="#22d3ee" />
-              <rect x="5" y="5" width="20" height="20" fill="black" />
-              <rect x="10" y="10" width="10" height="10" fill="#22d3ee" />
-
-              <rect x="70" y="0" width="30" height="30" fill="#22d3ee" />
-              <rect x="75" y="5" width="20" height="20" fill="black" />
-              <rect x="80" y="10" width="10" height="10" fill="#22d3ee" />
-
-              <rect x="0" y="70" width="30" height="30" fill="#22d3ee" />
-              <rect x="5" y="75" width="20" height="20" fill="black" />
-              <rect x="10" y="80" width="10" height="10" fill="#22d3ee" />
-
-              <rect x="40" y="10" width="10" height="20" fill="#22d3ee" />
-              <rect x="55" y="15" width="10" height="10" fill="#22d3ee" />
-              <rect x="35" y="40" width="30" height="10" fill="#22d3ee" />
-              <rect x="45" y="55" width="20" height="15" fill="#22d3ee" />
-              <rect x="70" y="45" width="20" height="20" fill="#22d3ee" />
-              <rect x="75" y="75" width="15" height="15" fill="#22d3ee" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-white">QR Code para Mesas & Balcão</h3>
-            <p className="text-xs text-zinc-400 mt-1">
-              Coloque nas mesas para seus clientes escanearem e abrirem o cardápio digital imediatamente no celular.
-            </p>
-            <span className="inline-block mt-2 text-[11px] font-bold text-cyan-300 bg-cyan-950 border border-cyan-800 px-2.5 py-0.5 rounded-md font-mono">
-              ✓ Bobina 58mm compatível
+          {gerando && (
+            <span className="flex items-center gap-1.5 text-cyan-400 text-xs font-mono animate-pulse">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Atualizando códigos...
             </span>
-          </div>
-        </div>
-
-        <div className="bg-zinc-950 p-6 rounded-2xl border border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.1)] flex flex-col justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-white">Link Direto do Cardápio</h3>
-            <p className="text-xs text-zinc-400 mt-1">
-              Compartilhe na bio do Instagram ou envie para clientes no WhatsApp.
-            </p>
-            <div className="mt-3 p-2 bg-black rounded-xl text-xs font-mono text-cyan-400 break-all border border-zinc-800">
-              {window.location.origin}
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.origin);
-              setCopiedMenu(true);
-              setTimeout(() => setCopiedMenu(false), 2000);
-            }}
-            className="mt-3 text-xs font-bold text-cyan-400 hover:text-cyan-300 self-start cursor-pointer"
-          >
-            Copiar link da página →
-          </button>
+          )}
         </div>
       </div>
 
-      {/* ======================================================== */}
-      {/* 1. MODO IMPRESSORA TÉRMICA DE 58mm (Cupom / Bobina de Balcão) */}
-      {/* ======================================================== */}
-      <div className={`ticket-58mm ${formatoImpressao === '58mm' ? 'block' : 'hidden print:hidden'}`}>
-        <div className="no-print mb-4 flex items-center justify-between bg-black/60 p-3 rounded-xl border border-cyan-500/30">
-          <div className="flex items-center gap-2 text-xs font-mono text-cyan-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>PRÉVIA DO CUPOM NÃO-FISCAL (BOBINA 58mm / LARGURA DE BALCÃO)</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => handlePrint('58mm')}
-            className="px-3.5 py-1.5 bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs rounded-lg shadow-[0_0_12px_rgba(34,211,238,0.7)] cursor-pointer flex items-center gap-1.5"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Imprimir Bobina 58mm</span>
-          </button>
-        </div>
+      {/* Grid de Tags / Cards das Mesas */}
+      <main className="grid-tags-print w-full max-w-4xl grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5" id="wrapperTags">
+        {Array.from({ length: totalMesas }, (_, idx) => {
+          const numMesa = idx + 1;
+          const numFormatado = String(numMesa).padStart(2, '0');
+          const qrSrc = qrImgs[numMesa];
 
-        {/* Cupom Estilo Bobina Térmica 58mm */}
-        <div className="max-w-[420px] bg-white text-black p-5 sm:p-6 rounded-xl shadow-[0_0_35px_rgba(0,0,0,0.8)] font-mono text-xs border border-zinc-300 print:max-w-none print:w-full print:border-none print:shadow-none print:p-0 text-left">
-          {/* Cabeçalho do Cupom */}
-          <div className="text-center pb-2">
-            <div className="font-black text-sm uppercase tracking-wider mb-0.5">
-              {restaurant.name}
-            </div>
-            <div className="text-[10px] uppercase text-zinc-700 leading-tight">
-              {restaurant.tagline}
-            </div>
-            <div className="text-[10px] text-zinc-600 mt-1 leading-tight">
-              {restaurant.address}
-            </div>
-            <div className="text-[10px] font-bold mt-0.5">
-              WhatsApp: {restaurant.whatsapp}
-            </div>
-            <div className="mt-1 text-[10px] text-zinc-500">
-              {dataAtual} · {horaAtual}
-            </div>
-          </div>
+          return (
+            <div
+              key={numMesa}
+              className="card-tag-print bg-white text-[#111] p-6 rounded-2xl flex flex-col items-center text-center border-2 border-dashed border-[#ff4b2b] shadow-2xl transition-transform hover:scale-[1.01]"
+            >
+              <div className="text-2xl font-black text-[#111] mb-2 tracking-wide font-sans">
+                MESA {numFormatado}
+              </div>
 
-          <div className="border-t border-dashed border-zinc-400 my-2" />
-
-          <div className="text-center font-bold text-[11px] uppercase tracking-wide">
-            *** CARDÁPIO DE PRODUTOS ***
-          </div>
-          <div className="text-center text-[9px] text-zinc-500">
-            (Impressora Térmica 58mm)
-          </div>
-
-          <div className="border-t border-dashed border-zinc-400 my-2" />
-
-          {/* Listagem de Itens por Categoria para 58mm */}
-          <div className="space-y-3">
-            {categories.map((cat) => {
-              const catItems = items.filter((i) => i.category === cat && i.available);
-              if (catItems.length === 0) return null;
-
-              return (
-                <div key={cat} className="space-y-1.5">
-                  <div className="bg-zinc-100 font-bold px-1 py-0.5 text-[10px] uppercase border-b border-zinc-300 flex justify-between">
-                    <span>&gt;&gt; {cat}</span>
-                    <span className="text-[9px] text-zinc-500">({catItems.length})</span>
+              <div className="bg-[#f8f9fa] p-2.5 rounded-xl border border-zinc-200 flex items-center justify-center min-w-[140px] min-h-[140px]">
+                {qrSrc ? (
+                  <img
+                    src={qrSrc}
+                    alt={`QR Code Mesa ${numFormatado}`}
+                    className="w-[130px] h-[130px] object-contain"
+                  />
+                ) : (
+                  <div className="w-[130px] h-[130px] flex items-center justify-center text-zinc-400 text-xs animate-pulse">
+                    Gerando QR...
                   </div>
+                )}
+              </div>
 
-                  {catItems.map((item) => (
-                    <div key={item.id} className="pt-0.5">
-                      <div className="flex justify-between items-baseline gap-1 font-bold">
-                        <span className="break-words flex-1 pr-1">{item.name}</span>
-                        <span className="tabular-nums shrink-0">
-                          R$ {item.price.toFixed(2).replace('.', ',')}
-                        </span>
-                      </div>
-                      <p className="text-[9px] text-zinc-600 leading-tight break-words">
-                        {item.shortDescription || item.ingredients}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
+              <p className="text-[12px] font-bold mt-3 text-zinc-800 leading-snug">
+                Aponte a câmera do celular
+                <br />e faça seu pedido direto!
+              </p>
 
-          <div className="border-t border-dashed border-zinc-400 my-3" />
-
-          {/* Totais & Rodapé Térmico */}
-          <div className="text-center text-[10px] space-y-1">
-            <div className="font-bold">TOTAL DE ITENS: {items.filter((i) => i.available).length}</div>
-            <div className="text-[9px] text-zinc-600">
-              Tempo Médio de Entrega: {restaurant.deliveryTime}
+              <span className="text-[9px] font-mono font-bold text-zinc-400 uppercase tracking-widest mt-2">
+                {restaurant.name || 'Dom Gabriel'}
+              </span>
             </div>
-            <div className="text-[9px] text-zinc-600">
-              Peça online: {window.location.origin}
-            </div>
-            <div className="font-bold text-[10px] pt-1 uppercase">
-              Obrigado pela preferência!
-            </div>
-          </div>
-
-          {/* Linha serrilhada para corte do papel */}
-          <div className="border-t-2 border-dotted border-zinc-500 my-3 text-center text-[9px] text-zinc-400 tracking-widest">
-            - - - - - - CORTE AQUI - - - - - -
-          </div>
-          <div className="h-6 print:h-8" />
-        </div>
-      </div>
-
-      {/* ======================================================== */}
-      {/* 2. MODO FOLHA A4 / PDF COMPLETO */}
-      {/* ======================================================== */}
-      <div className={`sheet-a4 ${formatoImpressao === 'a4' ? 'block' : 'hidden print:hidden'}`}>
-        <div className="no-print mb-4 flex items-center justify-between bg-black/60 p-3 rounded-xl border border-cyan-500/30">
-          <div className="flex items-center gap-2 text-xs font-mono text-cyan-400">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span>PRÉVIA EM FOLHA A4 COMPLETA (DESIGN GRÁFICO DE SALÃO)</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => handlePrint('a4')}
-            className="px-3.5 py-1.5 bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs rounded-lg shadow-[0_0_12px_rgba(34,211,238,0.7)] cursor-pointer flex items-center gap-1.5"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Imprimir Folha A4</span>
-          </button>
-        </div>
-
-        {/* Printable Sheet (Standard A4 Print Layout - High Contrast) */}
-        <div className="bg-zinc-950 text-white p-8 sm:p-12 rounded-2xl border border-cyan-500/30 shadow-[0_0_30px_rgba(6,182,212,0.1)] print:bg-white print:text-black print:border-none print:shadow-none print:p-0">
-          {/* Printable Header */}
-          <div className="text-center border-b-2 border-cyan-500/40 print:border-black pb-6 mb-8">
-            <span className="text-xs uppercase tracking-widest text-cyan-400 print:text-zinc-600 font-bold block mb-1 font-mono">
-              Cardápio Oficial
-            </span>
-            <h2 className="text-3xl font-black text-white print:text-black tracking-tight font-display">
-              {restaurant.name}
-            </h2>
-            <p className="text-sm text-zinc-400 print:text-zinc-700 italic mt-1 font-serif">
-              {restaurant.tagline}
-            </p>
-            <div className="flex items-center justify-center gap-4 text-xs text-zinc-500 print:text-zinc-600 mt-3 font-medium">
-              <span>{restaurant.address}</span>
-              <span>·</span>
-              <span>WhatsApp: {restaurant.whatsapp}</span>
-            </div>
-          </div>
-
-          {/* Printable Menu Sections */}
-          <div className="space-y-8">
-            {categories.map((cat) => {
-              const catItems = items.filter((i) => i.category === cat && i.available);
-              if (catItems.length === 0) return null;
-
-              return (
-                <div key={cat} className="print-card">
-                  <div className="flex items-center gap-3 mb-4">
-                    <h3 className="text-lg font-bold text-cyan-400 print:text-black uppercase tracking-wider font-mono">
-                      {cat}
-                    </h3>
-                    <div className="flex-1 h-px bg-cyan-950 print:bg-zinc-300" />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                    {catItems.map((item) => (
-                      <div key={item.id} className="border-b border-zinc-900 print:border-zinc-200 pb-3">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-sm font-bold text-white print:text-black">
-                            {item.name}
-                          </span>
-                          <span className="text-sm font-extrabold text-cyan-400 print:text-black tabular-nums font-mono shrink-0">
-                            R$ {item.price.toFixed(2)}
-                          </span>
-                        </div>
-                        <p className="text-xs text-zinc-400 print:text-zinc-700 mt-1 leading-relaxed">
-                          {item.shortDescription || item.ingredients}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Printable Footer */}
-          <div className="mt-12 pt-6 border-t border-zinc-900 print:border-zinc-200 text-center text-xs text-zinc-500">
-            <p>Agradecemos a sua preferência · Sabor Digital Delivery</p>
-          </div>
-        </div>
-      </div>
+          );
+        })}
+      </main>
     </div>
   );
 };
-

@@ -246,12 +246,13 @@
       const urlParams = new URLSearchParams(window.location.search);
       const mesaUrl = urlParams.get('mesa');
       if (mesaUrl) {
+        localStorage.setItem('mesaAtivaQrCode', mesaUrl);
         localStorage.setItem('numeroMesaFixoDoQrCode', mesaUrl);
         localStorage.setItem('modoPedido', 'mesa');
       }
 
       // 2. Verifica se existe mesa salva
-      const mesaSalva = localStorage.getItem('numeroMesaFixoDoQrCode');
+      const mesaSalva = localStorage.getItem('mesaAtivaQrCode') || localStorage.getItem('numeroMesaFixoDoQrCode');
       if (mesaSalva) {
         modoAtual = 'mesa';
         configurarInterfaceMesa(mesaSalva);
@@ -517,13 +518,24 @@
         return `${qtd}x ${n}`;
       });
 
-      // MONTAGEM DO OBJETO DE PEDIDO
+      // 🚨 NÚMERO SEQUENCIAL DO TURNO
+      let numeroDoPedidoAtual = parseInt(localStorage.getItem('contadorPedidosTurno')) || 0;
+      numeroDoPedidoAtual += 1;
+      localStorage.setItem('contadorPedidosTurno', numeroDoPedidoAtual);
+
+      const modoPedido = modoAtual === 'mesa' ? 'mesa' : 'delivery/viagem';
+      const mesaFixo = modoAtual === 'mesa' ? (localStorage.getItem('mesaAtivaQrCode') || localStorage.getItem('numeroMesaFixoDoQrCode') || mesaManual || '01') : null;
+
+      // MONTAGEM DO OBJETO DE PEDIDO PARA O FIREBASE
       const pedido = {
         cliente: nome,
         clienteNome: nome,
         telefone: telefone,
-        tipo: modoAtual === 'mesa' ? 'mesa' : 'delivery',
-        endereco: modoAtual === 'delivery' ? (complemento ? `${endereco} (${complemento})` : endereco) : 'Consumo no Salão',
+        tipo: modoPedido, // 'delivery/viagem' ou 'mesa'
+        numeroSequencial: String(numeroDoPedidoAtual).padStart(2, '0'), // Gera #01, #02...
+        mesa: modoPedido === 'mesa' ? (parseInt(mesaFixo || '1', 10) || 1) : null,
+        numeroMesa: modoPedido === 'mesa' ? (parseInt(mesaFixo || '1', 10) || 1) : null,
+        endereco: modoAtual === 'delivery' ? (complemento ? `${endereco} (${complemento})` : endereco) : `Consumo no Salão - Mesa ${mesaFixo || '01'}`,
         itens: itensFormatados,
         total: subtotal,
         subtotal: subtotal,
@@ -531,22 +543,9 @@
         troco: troco || null,
         observacoes: observacoes,
         status: 'pendente', // O status 'pendente' dispara a impressora térmica na cozinha!
+        data: new Date(),
         criadoEm: new Date().toISOString()
       };
-
-      // --- INJEÇÃO DA MESA (CAPTURA PELO QR CODE) ---
-      const mesaDoQrCode = localStorage.getItem('numeroMesaFixoDoQrCode');
-      if (mesaDoQrCode) {
-          // Injeta o número capturado no objeto que vai para a cozinha!
-          pedido.mesa = mesaDoQrCode;
-          pedido.numeroMesa = mesaDoQrCode;
-          pedido.tipo = 'mesa';
-          pedido.endereco = `Consumo no Salão - Mesa ${mesaDoQrCode}`;
-      } else if (modoAtual === 'mesa') {
-          pedido.mesa = mesaManual || '01';
-          pedido.numeroMesa = mesaManual || '01';
-          pedido.endereco = `Consumo no Salão - Mesa ${pedido.mesa}`;
-      }
 
       const btn = document.getElementById('btnEnviarPedido');
       if (btn) {

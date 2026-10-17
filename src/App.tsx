@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
 import { SplashScreen } from './components/SplashScreen';
 import { AuthScreen } from './components/AuthScreen';
 import { AdminPanel } from './components/AdminPanel';
@@ -8,13 +9,26 @@ import { CustomerPreview } from './components/CustomerPreview';
 import { IdeaGenerator } from './components/IdeaGenerator';
 import { PrintAndExport } from './components/PrintAndExport';
 import { RestaurantSettingsModal } from './components/RestaurantSettingsModal';
-import { DeliveryPanel } from './components/DeliveryPanel';
+import { DeliveryPanel, LogisticaSubTab } from './components/DeliveryPanel';
 import { EntregadorPanel } from './components/EntregadorPanel';
 import { AtendimentoLocalPanel } from './components/AtendimentoLocalPanel';
 import { MenuItem, RestaurantConfig, DishIdea } from './types';
 import { INITIAL_MENU_ITEMS, INITIAL_RESTAURANT } from './data/initialMenu';
+import { Menu, Settings as SettingsIcon } from 'lucide-react';
 
-export type AppTab = 'painel' | 'atendimento' | 'logistica' | 'entregador' | 'mesas' | 'admin' | 'preview' | 'delivery' | 'ideas' | 'export';
+export type AppTab =
+  | 'painel'
+  | 'atendimento'
+  | 'caixa'
+  | 'caixa_dia'
+  | 'logistica'
+  | 'entregador'
+  | 'mesas'
+  | 'admin'
+  | 'preview'
+  | 'delivery'
+  | 'ideas'
+  | 'export';
 
 export default function App() {
   // Screen state: 'splash' -> 'auth' -> 'app'
@@ -30,6 +44,8 @@ export default function App() {
   const [userRole, setUserRole] = useState<'admin' | 'customer' | 'entregador'>('admin');
   const [userIdentifier, setUserIdentifier] = useState('studio4zero5hamburgueria@gmail.com');
   const [painelSubTab, setPainelSubTab] = useState<'dashboard' | 'vendas' | 'financeiro' | 'estoque'>('dashboard');
+  const [logisticaSubTab, setLogisticaSubTab] = useState<LogisticaSubTab>('despacho');
+  const [comandaCaixaId, setComandaCaixaId] = useState<string | undefined>(undefined);
 
   const [activeTab, setActiveTab] = useState<AppTab>(() => {
     try {
@@ -39,11 +55,11 @@ export default function App() {
         return 'preview';
       }
       const tabParam = searchParams.get('tab') as AppTab | null;
-      if (tabParam && ['painel', 'atendimento', 'logistica', 'entregador', 'mesas', 'admin', 'preview', 'delivery', 'ideas', 'export'].includes(tabParam)) {
+      if (tabParam && ['painel', 'atendimento', 'caixa', 'caixa_dia', 'logistica', 'entregador', 'mesas', 'admin', 'preview', 'delivery', 'ideas', 'export'].includes(tabParam)) {
         return tabParam;
       }
       const hash = window.location.hash.replace('#', '') as AppTab;
-      if (hash && ['painel', 'atendimento', 'logistica', 'entregador', 'mesas', 'admin', 'preview', 'delivery', 'ideas', 'export'].includes(hash)) {
+      if (hash && ['painel', 'atendimento', 'caixa', 'caixa_dia', 'logistica', 'entregador', 'mesas', 'admin', 'preview', 'delivery', 'ideas', 'export'].includes(hash)) {
         return hash;
       }
     } catch {}
@@ -102,6 +118,24 @@ export default function App() {
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  const handleToggleSidebarCollapse = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Sync to both localStorage keys whenever menuItems changes
   useEffect(() => {
@@ -225,122 +259,259 @@ export default function App() {
   // Render Main Application (Para Administrador e Clientes)
   return (
     <div className="min-h-screen bg-black text-zinc-100 flex flex-col selection:bg-cyan-500 selection:text-black">
-      {/* Top Navbar (hidden in print) */}
-      <div className="no-print">
-        <Navbar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          painelSubTab={painelSubTab}
-          onSelectPainelSubTab={setPainelSubTab}
-          menuCount={menuItems.length}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          restaurantName={restaurantConfig.name}
-          userRole={userRole}
-          userIdentifier={userIdentifier}
-          onLogout={handleLogout}
-          onShowSplash={handleReplaySplash}
-        />
-      </div>
-
-      {/* Main Tab Panels - 100% integrados dentro da SPA sem páginas .html externas */}
-      <main className="flex-1">
-        {activeTab === 'painel' && (
-          <PainelGeral
-            restaurant={restaurantConfig}
-            menuItems={menuItems}
-            onAddMenuItem={handleAddDish}
-            onNavigateToPreview={() => setActiveTab('preview')}
-            onNavigateToAdminMenu={() => setActiveTab('admin')}
-            onNavigateToAtendimento={() => setActiveTab('atendimento')}
-            initialSubTab={painelSubTab}
-            activeSubTab={painelSubTab}
-            onSubTabChange={setPainelSubTab}
-          />
-        )}
-
-        {activeTab === 'atendimento' && (
-          <AtendimentoLocalPanel
-            restaurant={restaurantConfig}
-            menuItems={menuItems}
-            onVoltarPainel={() => setActiveTab('painel')}
-          />
-        )}
-
-        {(activeTab === 'logistica' || activeTab === 'delivery') && (
-          <DeliveryPanel
-            restaurant={restaurantConfig}
-            onVoltarPainel={() => setActiveTab('painel')}
-          />
-        )}
-
-        {activeTab === 'admin' && (
-          <AdminPanel
-            items={menuItems}
-            onAddDish={handleAddDish}
-            onUpdateDish={handleUpdateDish}
-            onDeleteDish={handleDeleteDish}
-            onToggleAvailability={handleToggleAvailability}
-            onViewClientMenu={() => setActiveTab('preview')}
-            onOpenDeliveryPanel={() => setActiveTab('logistica')}
-            onOpenPainelGeral={() => setActiveTab('painel')}
+      {/* Lateral Dashboard Menu para Administrador */}
+      {userRole === 'admin' && (
+        <div className="no-print">
+          <Sidebar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            painelSubTab={painelSubTab}
+            onSelectPainelSubTab={setPainelSubTab}
+            logisticaSubTab={logisticaSubTab}
+            onSelectLogisticaSubTab={setLogisticaSubTab}
+            menuCount={menuItems.length}
+            restaurantName={restaurantConfig.name}
+            userRole={userRole}
+            userIdentifier={userIdentifier}
             onOpenSettings={() => setIsSettingsOpen(true)}
-            restaurant={restaurantConfig}
-            onUpdateRestaurant={(newConfig) => {
-              setRestaurantConfig(newConfig);
-              localStorage.setItem('cardapio_studio_config', JSON.stringify(newConfig));
-            }}
+            onLogout={handleLogout}
+            onShowSplash={handleReplaySplash}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={handleToggleSidebarCollapse}
+            isMobileOpen={isMobileSidebarOpen}
+            onCloseMobile={() => setIsMobileSidebarOpen(false)}
           />
-        )}
-
-        {activeTab === 'preview' && (
-          <CustomerPreview restaurant={restaurantConfig} items={menuItems} />
-        )}
-
-        {activeTab === 'ideas' && <IdeaGenerator onUseIdea={handleUseIdea} />}
-
-        {activeTab === 'export' && (
-          <PrintAndExport restaurant={restaurantConfig} items={menuItems} />
-        )}
-      </main>
-
-      {/* Restaurant Settings Modal */}
-      <RestaurantSettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        config={restaurantConfig}
-        onSave={(newConfig) => setRestaurantConfig(newConfig)}
-      />
-
-      {/* Footer (hidden in print) */}
-      <footer className="no-print border-t border-zinc-900 bg-black py-6 mt-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-white">{restaurantConfig.name}</span>
-            <span>·</span>
-            <span className="text-cyan-400 font-mono">Sabor Digital Delivery com IA Gemini</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {userRole === 'admin' && (
-              <>
-                <button
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="hover:text-cyan-300 transition-colors cursor-pointer"
-                >
-                  Configurações
-                </button>
-                <span>·</span>
-                <button
-                  onClick={() => setActiveTab('admin')}
-                  className="hover:text-cyan-300 transition-colors cursor-pointer"
-                >
-                  Painel Admin
-                </button>
-              </>
-            )}
-          </div>
         </div>
-      </footer>
+      )}
+
+      {/* Conteúdo com recuo adaptativo quando a Sidebar estiver ativa */}
+      <div
+        className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
+          userRole === 'admin'
+            ? sidebarCollapsed
+              ? 'lg:pl-20'
+              : 'lg:pl-68'
+            : ''
+        }`}
+      >
+        {/* Top Header / Barra Superior */}
+        <div className="no-print">
+          {userRole === 'admin' ? (
+            <header className="sticky top-0 z-30 bg-[#0d0e12]/95 backdrop-blur-md border-b border-[#22242e] px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+              {/* Esquerda: Botão Menu Mobile + Título Dinâmico do Módulo */}
+              <div className="flex items-center gap-3 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setIsMobileSidebarOpen(true)}
+                  className="lg:hidden p-2 rounded-xl bg-[#181922] border border-[#29292e] hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer shrink-0"
+                  title="Abrir Menu Lateral"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm sm:text-base font-extrabold text-white tracking-tight truncate">
+                      {activeTab === 'painel' && 'Visão Geral do Negócio'}
+                      {(activeTab === 'atendimento' || activeTab === 'mesas') && 'Controle de Mesa'}
+                      {activeTab === 'caixa' && 'Frente de Caixa (PDV)'}
+                      {activeTab === 'caixa_dia' && 'Caixa do Dia (Fluxo Financeiro)'}
+                      {(activeTab === 'logistica' || activeTab === 'delivery') && (
+                        logisticaSubTab === 'despacho'
+                          ? 'Logística • Monitor de Despacho'
+                          : logisticaSubTab === 'motoboy'
+                          ? 'Logística • Motoboys & GPS'
+                          : logisticaSubTab === 'historico'
+                          ? 'Logística • Entregas Concluídas'
+                          : 'Logística • Hardware & Impressão'
+                      )}
+                      {activeTab === 'admin' && 'Cardápio Inteligente com IA'}
+                      {activeTab === 'ideas' && 'Laboratório Gastronômico Gemini'}
+                      {activeTab === 'preview' && 'Cardápio do Cliente (Visão Pública)'}
+                      {activeTab === 'export' && 'Central de QR Codes & Tags de Mesa'}
+                    </h2>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 hidden sm:block truncate">
+                    {restaurantConfig.name} • Centro de Comando Integrado
+                  </p>
+                </div>
+              </div>
+
+              {/* Direita: Badges de Status & Atalhos Rápidos */}
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                {/* Badge Ativo */}
+                <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Ativo</span>
+                </div>
+
+                {/* Atalho Configurações Gerais */}
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="p-2 rounded-lg bg-[#181922] hover:bg-zinc-800 border border-[#2a2c38] text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  title="Configurações do Restaurante"
+                >
+                  <SettingsIcon className="w-4 h-4 text-amber-400" />
+                </button>
+              </div>
+            </header>
+          ) : (
+            <Navbar
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              painelSubTab={painelSubTab}
+              onSelectPainelSubTab={setPainelSubTab}
+              menuCount={menuItems.length}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              restaurantName={restaurantConfig.name}
+              userRole={userRole}
+              userIdentifier={userIdentifier}
+              onLogout={handleLogout}
+              onShowSplash={handleReplaySplash}
+            />
+          )}
+        </div>
+
+        {/* Main Tab Panels - 100% integrados dentro da SPA sem páginas .html externas */}
+        <main className="flex-1">
+          {activeTab === 'painel' && (
+            <PainelGeral
+              restaurant={restaurantConfig}
+              menuItems={menuItems}
+              onAddMenuItem={handleAddDish}
+              onNavigateToPreview={() => setActiveTab('preview')}
+              onNavigateToAdminMenu={() => setActiveTab('admin')}
+              onNavigateToAtendimento={() => setActiveTab('atendimento')}
+              initialSubTab={painelSubTab}
+              activeSubTab={painelSubTab}
+              onSubTabChange={setPainelSubTab}
+            />
+          )}
+
+          {(activeTab === 'atendimento' || activeTab === 'mesas') && (
+            <AtendimentoLocalPanel
+              restaurant={restaurantConfig}
+              menuItems={menuItems}
+              onVoltarPainel={() => setActiveTab('painel')}
+              modoExibicao="controle_mesa"
+              onNavigateToCaixa={(cmdId) => {
+                if (cmdId) setComandaCaixaId(cmdId);
+                setActiveTab('caixa');
+              }}
+              onNavigateToCaixaDia={() => setActiveTab('caixa_dia')}
+              onNavigateToControleMesa={() => setActiveTab('atendimento')}
+            />
+          )}
+
+          {activeTab === 'caixa' && (
+            <AtendimentoLocalPanel
+              restaurant={restaurantConfig}
+              menuItems={menuItems}
+              onVoltarPainel={() => setActiveTab('painel')}
+              modoExibicao="caixa"
+              comandaSelecionadaIdExterno={comandaCaixaId}
+              onNavigateToCaixa={(cmdId) => {
+                if (cmdId) setComandaCaixaId(cmdId);
+                setActiveTab('caixa');
+              }}
+              onNavigateToCaixaDia={() => setActiveTab('caixa_dia')}
+              onNavigateToControleMesa={() => setActiveTab('atendimento')}
+            />
+          )}
+
+          {activeTab === 'caixa_dia' && (
+            <AtendimentoLocalPanel
+              restaurant={restaurantConfig}
+              menuItems={menuItems}
+              onVoltarPainel={() => setActiveTab('painel')}
+              modoExibicao="caixa_dia"
+              onNavigateToCaixa={(cmdId) => {
+                if (cmdId) setComandaCaixaId(cmdId);
+                setActiveTab('caixa');
+              }}
+              onNavigateToCaixaDia={() => setActiveTab('caixa_dia')}
+              onNavigateToControleMesa={() => setActiveTab('atendimento')}
+            />
+          )}
+
+          {(activeTab === 'logistica' || activeTab === 'delivery') && (
+            <DeliveryPanel
+              restaurant={restaurantConfig}
+              subTab={logisticaSubTab}
+              onSubTabChange={setLogisticaSubTab}
+            />
+          )}
+
+          {activeTab === 'admin' && (
+            <AdminPanel
+              items={menuItems}
+              onAddDish={handleAddDish}
+              onUpdateDish={handleUpdateDish}
+              onDeleteDish={handleDeleteDish}
+              onToggleAvailability={handleToggleAvailability}
+              onViewClientMenu={() => setActiveTab('preview')}
+              onOpenDeliveryPanel={() => setActiveTab('logistica')}
+              onOpenPainelGeral={() => setActiveTab('painel')}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              restaurant={restaurantConfig}
+              onUpdateRestaurant={(newConfig) => {
+                setRestaurantConfig(newConfig);
+                localStorage.setItem('cardapio_studio_config', JSON.stringify(newConfig));
+              }}
+            />
+          )}
+
+          {activeTab === 'preview' && (
+            <CustomerPreview restaurant={restaurantConfig} items={menuItems} />
+          )}
+
+          {activeTab === 'ideas' && <IdeaGenerator onUseIdea={handleUseIdea} />}
+
+          {activeTab === 'export' && (
+            <PrintAndExport restaurant={restaurantConfig} items={menuItems} />
+          )}
+        </main>
+
+        {/* Restaurant Settings Modal */}
+        <RestaurantSettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          config={restaurantConfig}
+          onSave={(newConfig) => setRestaurantConfig(newConfig)}
+        />
+
+        {/* Footer (hidden in print) */}
+        <footer className="no-print border-t border-zinc-900 bg-black py-6 mt-12">
+          <div className="w-full px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-white">{restaurantConfig.name}</span>
+              <span>·</span>
+              <span className="text-cyan-400 font-mono">Sabor Digital Delivery com IA Gemini</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {userRole === 'admin' && (
+                <>
+                  <button
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="hover:text-cyan-300 transition-colors cursor-pointer"
+                  >
+                    Configurações
+                  </button>
+                  <span>·</span>
+                  <button
+                    onClick={() => setActiveTab('admin')}
+                    className="hover:text-cyan-300 transition-colors cursor-pointer"
+                  >
+                    Painel Admin
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }

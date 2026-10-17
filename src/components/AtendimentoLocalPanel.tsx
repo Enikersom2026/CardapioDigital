@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Utensils,
   Plus,
@@ -27,16 +27,22 @@ import {
   TrendingUp,
   Receipt,
   Store,
+  Menu,
 } from 'lucide-react';
 import { db, doc, setDoc, updateDoc, onSnapshot, collection } from '../services/firebase';
-import { MenuItem, RestaurantConfig, ComandaLocal, ComandaPedidoItem, MovimentoCaixa } from '../types';
-import { CATEGORIES } from '../data/initialMenu';
+import { MenuItem, RestaurantConfig, ComandaLocal, ComandaPedidoItem, MovimentoCaixa, DishAddon } from '../types';
+import { CATEGORIES, DEFAULT_ADICIONAIS } from '../data/initialMenu';
 import { imprimirCupomCozinha, imprimirCupomComandaLocal, testarImpressoraTermica, conectarImpressoraBluetooth } from '../utils/thermalPrinter';
 
 interface AtendimentoLocalPanelProps {
   restaurant: RestaurantConfig;
   menuItems: MenuItem[];
   onVoltarPainel?: () => void;
+  modoExibicao?: 'controle_mesa' | 'caixa' | 'caixa_dia';
+  comandaSelecionadaIdExterno?: string;
+  onNavigateToCaixa?: (comandaId?: string) => void;
+  onNavigateToCaixaDia?: () => void;
+  onNavigateToControleMesa?: () => void;
 }
 
 // Comandas iniciais de demonstração caso esteja vazio
@@ -46,7 +52,7 @@ const COMANDAS_INICIAIS: ComandaLocal[] = [
     numeroComanda: 'M-01',
     tipo: 'mesa',
     numeroMesa: 1,
-    clienteNome: 'Roberto Alencar & Amigos',
+    clienteNome: 'Mesa 01',
     clienteTelefone: '11987654321',
     atendente: 'Pedro',
     itens: [
@@ -64,7 +70,7 @@ const COMANDAS_INICIAIS: ComandaLocal[] = [
     numeroComanda: 'M-03',
     tipo: 'mesa',
     numeroMesa: 3,
-    clienteNome: 'Família Mendonça (4 pessoas)',
+    clienteNome: 'Mesa 03',
     clienteTelefone: '11999887766',
     atendente: 'Ana',
     itens: [
@@ -130,9 +136,31 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
   restaurant,
   menuItems,
   onVoltarPainel,
+  modoExibicao = 'controle_mesa',
+  comandaSelecionadaIdExterno,
+  onNavigateToCaixa,
+  onNavigateToCaixaDia,
+  onNavigateToControleMesa,
 }) => {
   // Aba interna do painel: 'salao' | 'lancar' | 'caixa' | 'relatorio_caixa'
-  const [subAba, setSubAba] = useState<'salao' | 'lancar' | 'caixa' | 'relatorio_caixa'>('salao');
+  const [subAba, setSubAba] = useState<'salao' | 'lancar' | 'caixa' | 'relatorio_caixa'>(() => {
+    if (modoExibicao === 'caixa') return 'caixa';
+    if (modoExibicao === 'caixa_dia') return 'relatorio_caixa';
+    return 'salao';
+  });
+
+  // Sincroniza a subAba caso o modoExibicao mude externamente via Menu Lateral
+  useEffect(() => {
+    if (modoExibicao === 'caixa') {
+      setSubAba('caixa');
+    } else if (modoExibicao === 'caixa_dia') {
+      setSubAba('relatorio_caixa');
+    } else if (modoExibicao === 'controle_mesa') {
+      if (subAba === 'caixa' || subAba === 'relatorio_caixa') {
+        setSubAba('salao');
+      }
+    }
+  }, [modoExibicao]);
 
   // Estado das comandas locais
   const [comandas, setComandas] = useState<ComandaLocal[]>(() => {
@@ -158,16 +186,28 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
     return MOVIMENTOS_CAIXA_INICIAIS;
   });
 
-  // Escuta Firestore em tempo real
+  // Escuta Firestore e alterações de mesas em tempo real
   useEffect(() => {
+    const syncMesas = () => {
+      try {
+        const v = localStorage.getItem('totalMesasLayout');
+        if (v && parseInt(v) > 0) setTotalMesasConfiguradas(parseInt(v));
+      } catch {}
+    };
+
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'totalMesasLayout' && e.newValue) {
         const val = parseInt(e.newValue);
         if (val > 0) setTotalMesasConfiguradas(val);
       }
     };
+
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    window.addEventListener('mesasUpdated', syncMesas);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('mesasUpdated', syncMesas);
+    };
   }, []);
 
   useEffect(() => {
@@ -191,6 +231,84 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
     }
   }, []);
 
+  // GATILHO EM TEMPO REAL: ESCUTA, ABRE A COMANDA E IMPRIME SOZINHO NA CHAPA
+  useEffect(() => {
+    let primeiraCarga = true;
+    try {
+      const unsub = onSnapshot(collection(db, 'pedidos'), (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          // Monitora apenas novos pedidos criados na plataforma
+          if (change.type === 'added') {
+            const pedidoNovo = change.doc.data() as any;
+            pedidoNovo.id = change.doc.id;
+
+            // Se for um pedido novo que entrou como pendente (via QR Code ou Caixa)
+            if (!primeiraCarga && pedidoNovo.status === 'pendente') {
+              // Chama a nossa função ESC/POS que configuramos via USB ou Bluetooth
+              if (typeof (window as any).imprimirComandaCozinha === 'function') {
+                (window as any).imprimirComandaCozinha(pedidoNovo);
+              } else {
+                imprimirCupomCozinha(pedidoNovo);
+              }
+
+              // Se for pedido de mesa pelo QR Code, integra com o painel de comandas local
+              if (pedidoNovo.tipo === 'mesa' && pedidoNovo.mesa) {
+                const mesaNum = parseInt(pedidoNovo.mesa, 10);
+                const itensNovos: ComandaPedidoItem[] = (pedidoNovo.itens || []).map((it: any, i: number) => {
+                  const nome = typeof it === 'string' ? it : (it.nome || 'Item');
+                  const preco = typeof it === 'object' && it.preco ? Number(it.preco) : 0;
+                  return {
+                    id: `it-qr-${Date.now()}-${i}`,
+                    nome,
+                    preco,
+                    quantidade: (typeof it === 'object' && it.quantidade) ? it.quantidade : 1,
+                    horaLancamento: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                  };
+                });
+
+                setComandas((atuais) => {
+                  const comandaExistente = atuais.find(
+                    (c) => c.status === 'aberta' && c.tipo === 'mesa' && c.numeroMesa === mesaNum
+                  );
+
+                  if (comandaExistente) {
+                    const itensAtualizados = [...comandaExistente.itens, ...itensNovos];
+                    const subtotal = itensAtualizados.reduce((acc, x) => acc + x.preco * x.quantidade, 0);
+                    const comandaAtualizada = { ...comandaExistente, itens: itensAtualizados, subtotal, total: subtotal };
+                    const novaLista = atuais.map((c) => (c.id === comandaExistente.id ? comandaAtualizada : c));
+                    salvarComandas(novaLista);
+                    return novaLista;
+                  } else {
+                    const subtotal = pedidoNovo.total || itensNovos.reduce((acc, x) => acc + x.preco * x.quantidade, 0);
+                    const novaComanda: ComandaLocal = {
+                      id: `cmd-qr-${pedidoNovo.id}`,
+                      numeroComanda: String(mesaNum).padStart(2, '0'),
+                      tipo: 'mesa',
+                      numeroMesa: mesaNum,
+                      clienteNome: pedidoNovo.cliente || `Mesa ${mesaNum}`,
+                      status: 'aberta',
+                      itens: itensNovos,
+                      subtotal,
+                      total: subtotal,
+                      abertaEm: new Date().toISOString(),
+                    };
+                    const novaLista = [novaComanda, ...atuais];
+                    salvarComandas(novaLista);
+                    return novaLista;
+                  }
+                });
+              }
+            }
+          }
+        });
+        primeiraCarga = false;
+      });
+      return () => unsub();
+    } catch (err) {
+      console.warn('Listener Firestore pedidos AtendimentoLocalPanel:', err);
+    }
+  }, []);
+
   // Salvar no storage
   const salvarComandas = (novas: ComandaLocal[]) => {
     setComandas(novas);
@@ -208,8 +326,14 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
 
   // Comanda selecionada no momento (para lançar ou fechar)
   const [comandaSelecionadaId, setComandaSelecionadaId] = useState<string>(
-    comandas[0]?.id || ''
+    comandaSelecionadaIdExterno || comandas[0]?.id || ''
   );
+
+  useEffect(() => {
+    if (comandaSelecionadaIdExterno) {
+      setComandaSelecionadaId(comandaSelecionadaIdExterno);
+    }
+  }, [comandaSelecionadaIdExterno]);
 
   const comandaAtual = useMemo(() => {
     return comandas.find((c) => c.id === comandaSelecionadaId) || comandas[0];
@@ -245,9 +369,39 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
   const [buscaLancar, setBuscaLancar] = useState('');
   const [itemSelecionadoParaLancar, setItemSelecionadoParaLancar] = useState<MenuItem | null>(null);
   const [qtdLancar, setQtdLancar] = useState(1);
-  const [adicionaisLancar, setAdicionaisLancar] = useState<string[]>([]);
+  const [adicionaisLancar, setAdicionaisLancar] = useState<DishAddon[]>([]);
+  const [adicionaisMesaVisual, setAdicionaisMesaVisual] = useState<DishAddon[]>([]);
   const [obsLancar, setObsLancar] = useState('');
   const [feedbackLancamento, setFeedbackLancamento] = useState<string | null>(null);
+
+  // Catálogo dinâmico de adicionais disponíveis
+  const listaAdicionaisDisponiveis = useMemo<DishAddon[]>(() => {
+    if (itemSelecionadoParaLancar?.adicionais && itemSelecionadoParaLancar.adicionais.length > 0) {
+      return itemSelecionadoParaLancar.adicionais;
+    }
+    try {
+      const salvos = localStorage.getItem('cardapio_adicionais_cadastrados');
+      if (salvos) {
+        const parsed = JSON.parse(salvos);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((a: any) => ({
+            id: a.id || `add-${Math.random()}`,
+            name: a.name || a.nome || 'Adicional',
+            price: Number(a.price || a.preco || 0),
+          }));
+        }
+      }
+    } catch {}
+    return DEFAULT_ADICIONAIS;
+  }, [itemSelecionadoParaLancar]);
+
+  // Soma financeira dos adicionais por unidade
+  const somaAdicionaisLancar = useMemo(() => {
+    return adicionaisLancar.reduce((acc, adic) => acc + (Number(adic.price) || 0), 0);
+  }, [adicionaisLancar]);
+
+  const precoUnitarioFinalLancar = (itemSelecionadoParaLancar?.price || 0) + somaAdicionaisLancar;
+  const totalLancamentoItem = precoUnitarioFinalLancar * qtdLancar;
 
   // Estado da Impressora Térmica USB/Serial
   const [feedbackImpressora, setFeedbackImpressora] = useState<string | null>(null);
@@ -273,6 +427,31 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
   const [nomeClienteMesaVisual, setNomeClienteMesaVisual] = useState('');
   const [produtoMesaVisual, setProdutoMesaVisual] = useState<string>('');
 
+  // Menu Hambúrguer Flutuante (Comandas Abertas, Consumo no Salão, Caixa do Dia, Itens do Cardápio)
+  const [menuHamburguerFlutuanteAberto, setMenuHamburguerFlutuanteAberto] = useState(false);
+  const menuHamburguerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuHamburguerRef.current && !menuHamburguerRef.current.contains(event.target as Node)) {
+        setMenuHamburguerFlutuanteAberto(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuHamburguerFlutuanteAberto(false);
+      }
+    };
+    if (menuHamburguerFlutuanteAberto) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [menuHamburguerFlutuanteAberto]);
+
   // 1. ABRIR NOVA COMANDA
   const handleCriarComanda = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,7 +464,7 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
       numeroComanda: identificador,
       tipo: novoTipo,
       numeroMesa: novoTipo === 'mesa' ? novoNumeroMesa : undefined,
-      clienteNome: novoCliente.trim() || (novoTipo === 'mesa' ? `Mesa ${novoNumeroMesa}` : 'Cliente Balcão'),
+      clienteNome: novoTipo === 'mesa' ? `Mesa ${String(novoNumeroMesa).padStart(2, '0')}` : (novoCliente.trim() || 'Cliente Balcão'),
       clienteTelefone: novoTelefone.trim() || undefined,
       atendente: novoAtendente.trim() || 'Geral',
       itens: [],
@@ -318,13 +497,21 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
   const handleConfirmarLancamentoItem = async () => {
     if (!comandaAtual || !itemSelecionadoParaLancar) return;
 
+    // Calcula preço unitário somando o preço base do lanche + adicionais escolhidos
+    const somaAdics = adicionaisLancar.reduce((acc, a) => acc + (Number(a.price) || 0), 0);
+    const precoUnitarioComAdicionais = itemSelecionadoParaLancar.price + somaAdics;
+
+    const adicionaisFormatados = adicionaisLancar.map(
+      (a) => `${a.name.startsWith('+') ? a.name : `+ ${a.name}`} (R$ ${(Number(a.price) || 0).toFixed(2).replace('.', ',')})`
+    );
+
     const novoItemComanda: ComandaPedidoItem = {
       id: `it-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       itemId: itemSelecionadoParaLancar.id,
       nome: itemSelecionadoParaLancar.name,
-      preco: itemSelecionadoParaLancar.price,
+      preco: precoUnitarioComAdicionais, // 🚨 SOMA O VALOR DO ADICIONAL AO PREÇO DO ITEM!
       quantidade: qtdLancar,
-      adicionais: adicionaisLancar.length > 0 ? adicionaisLancar : undefined,
+      adicionais: adicionaisFormatados.length > 0 ? adicionaisFormatados : undefined,
       observacao: obsLancar.trim() || undefined,
       horaLancamento: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     };
@@ -657,105 +844,254 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)] bg-[#0f0f12] text-white">
-      {/* 1. CABEÇALHO DO ATENDIMENTO LOCAL COM AS 4 SUB-ABAS */}
+      {/* 1. CABEÇALHO DO ATENDIMENTO LOCAL COM AS SUB-ABAS */}
       <header className="bg-[#1a1a1e] px-4 sm:px-8 py-3.5 border-b border-[#29292e] flex flex-col lg:flex-row lg:items-center justify-between gap-3 shadow-md">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-cyan-950/70 border border-cyan-800/50 flex items-center justify-center text-xl shadow-[0_0_12px_rgba(34,211,238,0.3)] shrink-0">
-            🍽️
-          </div>
           <div>
             <h1 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
-              <span>Atendimento no Local & Caixa</span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800">
-                Salão & Balcão PDV
+              <span>
+                {modoExibicao === 'caixa'
+                  ? 'Frente de Caixa (PDV)'
+                  : modoExibicao === 'caixa_dia'
+                  ? 'Caixa do Dia'
+                  : 'Controle de Mesa'}
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                modoExibicao === 'caixa'
+                  ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                  : modoExibicao === 'caixa_dia'
+                  ? 'bg-amber-950 text-amber-300 border-amber-800'
+                  : 'bg-cyan-950 text-cyan-300 border-cyan-800'
+              }`}>
+                {modoExibicao === 'caixa'
+                  ? 'Fechamento de Comandas'
+                  : modoExibicao === 'caixa_dia'
+                  ? 'Livro Caixa & Fluxo'
+                  : 'Comanda'}
               </span>
             </h1>
             <p className="text-xs text-[#8d8d99]">
-              {restaurant.name} • Abertura de comandas, lançamento de pedidos e frente de caixa
+              {modoExibicao === 'caixa'
+                ? `${restaurant.name} • Receba pagamentos via Pix, Cartão ou Dinheiro, calcule troco e finalize comandas`
+                : modoExibicao === 'caixa_dia'
+                ? `${restaurant.name} • Movimentações financeiras, saldo em gaveta, Pix, cartões, sangrias e suprimentos`
+                : `${restaurant.name} • Abertura e acompanhamento de comandas, mesas e lançamento de pedidos`}
             </p>
           </div>
         </div>
 
-        {/* Botões das 4 Sub-Abas do Atendimento */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#202024] border border-[#29292e] overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setSubAba('salao')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              subAba === 'salao'
-                ? 'bg-cyan-500 text-black shadow-md'
-                : 'text-[#8d8d99] hover:text-white hover:bg-[#28282e]'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>🍽️ Salão & Comandas</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/30 font-mono font-bold">
-              {comandasAbertas.length}
-            </span>
-          </button>
+        {/* Botões das Sub-Abas do Controle de Mesa OU Atalhos Rápidos */}
+        {modoExibicao === 'controle_mesa' ? (
+          <div className="flex items-center gap-2 sm:gap-3 ml-auto sm:ml-0">
+            {/* Abas Comanda, + Abrir Comanda / Mesa e Lançar Pedidos */}
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#202024] border border-[#29292e]">
+              <button
+                type="button"
+                onClick={() => setSubAba('salao')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  subAba === 'salao'
+                    ? 'bg-cyan-500 text-black shadow-md'
+                    : 'text-[#8d8d99] hover:text-white hover:bg-[#28282e]'
+                }`}
+              >
+                <span>Comanda</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/30 font-mono font-bold">
+                  {comandasAbertas.length}
+                </span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setSubAba('lancar')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              subAba === 'lancar'
-                ? 'bg-[#ff4b2b] text-white shadow-md'
-                : 'text-[#8d8d99] hover:text-white hover:bg-[#28282e]'
-            }`}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>➕ Lançar Pedidos</span>
-          </button>
+              <button
+                type="button"
+                onClick={() => setModalNovaComandaAberto(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black shadow-md hover:brightness-110"
+                title="Abrir comanda ou mesa"
+              >
+                <Plus className="w-3.5 h-3.5 text-black" />
+                <span>+ Abrir Comanda / Mesa</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setSubAba('caixa')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              subAba === 'caixa'
-                ? 'bg-emerald-500 text-black shadow-md'
-                : 'text-[#8d8d99] hover:text-white hover:bg-[#28282e]'
-            }`}
-          >
-            <DollarSign className="w-3.5 h-3.5" />
-            <span>💳 Frente de Caixa</span>
-          </button>
+              <button
+                type="button"
+                onClick={() => setSubAba('lancar')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  subAba === 'lancar'
+                    ? 'bg-[#ff4b2b] text-white shadow-md'
+                    : 'text-[#8d8d99] hover:text-white hover:bg-[#28282e]'
+                }`}
+              >
+                <span>Lançar Pedidos</span>
+              </button>
+            </div>
 
-          <button
-            type="button"
-            onClick={() => setSubAba('relatorio_caixa')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              subAba === 'relatorio_caixa'
-                ? 'bg-amber-500 text-black shadow-md'
-                : 'text-[#8d8d99] hover:text-white hover:bg-[#28282e]'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>📊 Caixa do Dia</span>
-          </button>
+            {/* Menu Hambúrguer Flutuante - Posicionado mais para a direita */}
+            <div className="relative" ref={menuHamburguerRef}>
+              <button
+                type="button"
+                onClick={() => setMenuHamburguerFlutuanteAberto(!menuHamburguerFlutuanteAberto)}
+                className={`p-2 sm:p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center shadow-lg ${
+                  menuHamburguerFlutuanteAberto
+                    ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 ring-2 ring-cyan-500/40'
+                    : 'bg-[#202024] hover:bg-[#28282e] border-[#29292e] text-zinc-300 hover:text-white hover:border-zinc-500'
+                }`}
+                title="Menu Flutuante do Salão: Comandas Abertas, Consumo no Salão, Caixa do Dia e Itens do Cardápio"
+                aria-label="Abrir Menu Flutuante do Salão"
+              >
+                <Menu className="w-5 h-5 text-current" />
+              </button>
 
-          {/* Conexão Bluetooth Sem Fio */}
-          <button
-            type="button"
-            onClick={handleConectarBluetooth}
-            disabled={imprimindoSerial}
-            title="Conectar impressora térmica Bluetooth (Celular, Tablet ou sem fio)"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap bg-zinc-900/90 hover:bg-zinc-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-500/60 shadow-xs disabled:opacity-50"
-          >
-            <span>📱 Bluetooth</span>
-          </button>
+              {/* Dropdown / Menu Flutuante */}
+              {menuHamburguerFlutuanteAberto && (
+                <div className="absolute right-0 top-full mt-2.5 w-80 sm:w-96 rounded-2xl bg-[#18181c]/98 backdrop-blur-md border border-[#2e2e38] shadow-[0_16px_50px_rgba(0,0,0,0.95)] z-50 p-4 animate-fadeIn">
+                  {/* Cabeçalho do Menu */}
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#29292e]">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+                      <h3 className="text-xs font-black uppercase tracking-wider text-white">
+                        Painel Flutuante do Salão
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMenuHamburguerFlutuanteAberto(false)}
+                      className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-[#28282e] transition-colors cursor-pointer"
+                      title="Fechar Menu"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
 
-          {/* Teste Rápido de Impressora Térmica USB/Serial */}
-          <button
-            type="button"
-            onClick={handleTestarImpressora}
-            disabled={imprimindoSerial}
-            title="Conectar e testar impressora térmica USB/Serial cadastrada (ESC/POS 9600 baud)"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap bg-zinc-900/90 hover:bg-zinc-800 text-orange-400 hover:text-orange-300 border border-orange-500/30 hover:border-orange-500/60 shadow-xs disabled:opacity-50"
-          >
-            <Printer className="w-3.5 h-3.5 text-orange-400" />
-            <span className="hidden sm:inline">Testar Térmica USB</span>
-          </button>
-        </div>
+                  {/* Lista dos 4 Itens: Comandas Abertas, Consumo no Salão, Caixa do Dia, Itens do Cardápio */}
+                  <div className="space-y-2.5">
+                    {/* 1. Comandas Abertas */}
+                    <div
+                      onClick={() => {
+                        setSubAba('salao');
+                        setMenuHamburguerFlutuanteAberto(false);
+                      }}
+                      className="p-3.5 rounded-xl bg-[#202026] hover:bg-[#262630] border border-[#2c2c36] hover:border-cyan-500/50 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#8d8d99] group-hover:text-cyan-400 transition-colors">
+                          Comandas Abertas
+                        </span>
+                        <span className="text-[11px] font-bold text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-800/60">
+                          Ver Salão →
+                        </span>
+                      </div>
+                      <div className="text-2xl font-black text-cyan-400 mt-1 tabular-nums">
+                        {comandasAbertas.length}
+                      </div>
+                      <span className="text-[11px] text-[#8d8d99] block mt-0.5">
+                        {comandasAbertas.filter((c) => c.tipo === 'mesa').length} mesas •{' '}
+                        {comandasAbertas.filter((c) => c.tipo === 'balcao').length} balcão em atendimento
+                      </span>
+                    </div>
+
+                    {/* 2. Consumo no Salão */}
+                    <div className="p-3.5 rounded-xl bg-[#202026] border border-[#2c2c36]">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-[#8d8d99]">
+                        Consumo no Salão
+                      </span>
+                      <div className="text-2xl font-black text-amber-400 mt-1 tabular-nums">
+                        R$ {totalConsumoSalão.toFixed(2).replace('.', ',')}
+                      </div>
+                      <span className="text-[11px] text-[#8d8d99] block mt-0.5">
+                        em aberto acumulado nas mesas e comandas
+                      </span>
+                    </div>
+
+                    {/* 3. Caixa do Dia */}
+                    <div
+                      onClick={() => {
+                        setMenuHamburguerFlutuanteAberto(false);
+                        if (onNavigateToCaixaDia) {
+                          onNavigateToCaixaDia();
+                        } else {
+                          setSubAba('relatorio_caixa');
+                        }
+                      }}
+                      className="p-3.5 rounded-xl bg-[#202026] hover:bg-[#262630] border border-[#2c2c36] hover:border-[#00b37e]/50 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#8d8d99] group-hover:text-[#00b37e] transition-colors">
+                          Caixa do Dia
+                        </span>
+                        <span className="text-[11px] font-bold text-[#00b37e] bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-800/60">
+                          Acessar Caixa →
+                        </span>
+                      </div>
+                      <div className="text-2xl font-black text-[#00b37e] mt-1 tabular-nums">
+                        R$ {totalRecebidoCaixaHoje.toFixed(2).replace('.', ',')}
+                      </div>
+                      <span className="text-[11px] text-[#8d8d99] block mt-0.5">
+                        {comandasPagasHoje.length} comandas pagas hoje
+                      </span>
+                    </div>
+
+                    {/* 4. Itens do Cardápio */}
+                    <div
+                      onClick={() => {
+                        setSubAba('lancar');
+                        setMenuHamburguerFlutuanteAberto(false);
+                      }}
+                      className="p-3.5 rounded-xl bg-[#202026] hover:bg-[#262630] border border-[#2c2c36] hover:border-purple-500/50 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#8d8d99] group-hover:text-purple-400 transition-colors">
+                          Itens do Cardápio
+                        </span>
+                        <span className="text-[11px] font-bold text-purple-400 bg-purple-950/80 px-2 py-0.5 rounded-md border border-purple-800/60">
+                          Lançar Itens →
+                        </span>
+                      </div>
+                      <div className="text-2xl font-black text-purple-400 mt-1 tabular-nums">
+                        {menuItems.length}
+                      </div>
+                      <span className="text-[11px] text-[#8d8d99] block mt-0.5">
+                        produtos disponíveis para lançamento no PDV
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            {modoExibicao === 'caixa' && onNavigateToCaixaDia && (
+              <button
+                type="button"
+                onClick={onNavigateToCaixaDia}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202024] hover:bg-[#28282e] border border-[#29292e] text-amber-300 text-xs font-bold transition-all cursor-pointer"
+                title="Acessar Caixa do Dia"
+              >
+                <span>Ver Caixa do Dia</span>
+              </button>
+            )}
+
+            {modoExibicao === 'caixa_dia' && onNavigateToCaixa && (
+              <button
+                type="button"
+                onClick={() => onNavigateToCaixa()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202024] hover:bg-[#28282e] border border-[#29292e] text-emerald-300 text-xs font-bold transition-all cursor-pointer"
+                title="Acessar Frente de Caixa"
+              >
+                <span>Ir p/ Frente de Caixa</span>
+              </button>
+            )}
+
+            {onNavigateToControleMesa && (
+              <button
+                type="button"
+                onClick={onNavigateToControleMesa}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202024] hover:bg-[#28282e] border border-[#29292e] text-cyan-300 text-xs font-bold transition-all cursor-pointer"
+                title="Voltar para Controle de Mesa"
+              >
+                <span>Controle de Mesa</span>
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
       {/* Alerta / Feedback de Impressão Térmica */}
@@ -781,192 +1117,7 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
         {/* ============================================================== */}
         {subAba === 'salao' && (
           <div className="max-w-6xl mx-auto space-y-6 animate-fadeIn">
-            {/* Top Bar de Ações e Métricas */}
-            <div className="p-5 rounded-2xl bg-[#1a1a1e] border border-[#29292e] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <span>Mesas & Comandas Abertas</span>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800">
-                    {comandasAbertas.length} em atendimento
-                  </span>
-                </h2>
-                <p className="text-xs sm:text-sm text-[#8d8d99] mt-0.5">
-                  Abra comandas para mesas do salão ou clientes no balcão, lance hambúrgueres e acompanhe o consumo.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setModalNovaComandaAberto(true)}
-                  className="px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-extrabold text-xs sm:text-sm rounded-xl transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4 text-black" />
-                  <span>+ Abrir Comanda / Mesa</span>
-                </button>
-              </div>
-            </div>
-
-            {/* 4 Cards de Métricas do Salão */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              <div className="p-4 rounded-xl bg-[#1a1a1e] border border-[#29292e]">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#8d8d99]">Comandas Abertas</span>
-                <div className="text-2xl font-black text-cyan-400 mt-1 tabular-nums">
-                  {comandasAbertas.length}
-                </div>
-                <span className="text-[11px] text-[#8d8d99]">
-                  {comandasAbertas.filter((c) => c.tipo === 'mesa').length} mesas •{' '}
-                  {comandasAbertas.filter((c) => c.tipo === 'balcao').length} balcão
-                </span>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#1a1a1e] border border-[#29292e]">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#8d8d99]">Consumo no Salão</span>
-                <div className="text-2xl font-black text-amber-400 mt-1 tabular-nums">
-                  R$ {totalConsumoSalão.toFixed(2).replace('.', ',')}
-                </div>
-                <span className="text-[11px] text-[#8d8d99]">em aberto nas comandas</span>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#1a1a1e] border border-[#29292e]">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#8d8d99]">Caixa do Dia</span>
-                <div className="text-2xl font-black text-[#00b37e] mt-1 tabular-nums">
-                  R$ {totalRecebidoCaixaHoje.toFixed(2).replace('.', ',')}
-                </div>
-                <span className="text-[11px] text-[#8d8d99]">{comandasPagasHoje.length} comandas pagas</span>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#1a1a1e] border border-[#29292e]">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#8d8d99]">Itens do Cardápio</span>
-                <div className="text-2xl font-black text-purple-400 mt-1 tabular-nums">
-                  {menuItems.length}
-                </div>
-                <span className="text-[11px] text-[#8d8d99]">disponíveis para lançamento</span>
-              </div>
-            </div>
-
-            {/* Filtros, Busca e Seletor de Visualização (Grid Visual vs Cards) */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-[#1a1a1e] border border-[#29292e]">
-              <div className="flex items-center gap-1.5 overflow-x-auto">
-                {/* Seletor Visual Quadradinhos vs Cards */}
-                <div className="flex items-center p-0.5 rounded-lg bg-[#14151e] border border-[#29292e] mr-2">
-                  <button
-                    type="button"
-                    onClick={() => setModoVisualSalao('quadradinhos')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
-                      modoVisualSalao === 'quadradinhos'
-                        ? 'bg-[#ff9f1c] text-black shadow-xs'
-                        : 'text-zinc-400 hover:text-white'
-                    }`}
-                    title="Grid Visual Dinâmico de Mesas com Quadradinhos Coloridos"
-                  >
-                    <span>🪑 Grid Visual</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setModoVisualSalao('cards')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
-                      modoVisualSalao === 'cards'
-                        ? 'bg-cyan-500 text-black shadow-xs'
-                        : 'text-zinc-400 hover:text-white'
-                    }`}
-                    title="Cards Detalhados com Itens e Histórico"
-                  >
-                    <span>📋 Lista Cards</span>
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setFiltroStatusComanda('todas')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    filtroStatusComanda === 'todas'
-                      ? 'bg-cyan-500 text-black shadow-xs'
-                      : 'text-[#8d8d99] hover:text-white'
-                  }`}
-                >
-                  Todas ({comandas.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFiltroStatusComanda('mesas')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    filtroStatusComanda === 'mesas'
-                      ? 'bg-cyan-500 text-black shadow-xs'
-                      : 'text-[#8d8d99] hover:text-white'
-                  }`}
-                >
-                  Mesas Salão ({comandas.filter((c) => c.tipo === 'mesa').length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFiltroStatusComanda('balcao')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    filtroStatusComanda === 'balcao'
-                      ? 'bg-cyan-500 text-black shadow-xs'
-                      : 'text-[#8d8d99] hover:text-white'
-                  }`}
-                >
-                  Balcão & Viagem ({comandas.filter((c) => c.tipo === 'balcao').length})
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  id="btnCadastrarMesa"
-                  onClick={() => {
-                    const novaQtd = totalMesasConfiguradas + 1;
-                    setTotalMesasConfiguradas(novaQtd);
-                    try {
-                      localStorage.setItem('totalMesasLayout', String(novaQtd));
-                      window.dispatchEvent(new Event('storage'));
-                    } catch {}
-                    setFeedbackLancamento(`🎉 Mesa ${novaQtd} cadastrada com sucesso no salão!`);
-                    setTimeout(() => setFeedbackLancamento(null), 3500);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-xs"
-                  title="Cadastrar +1 mesa imediatamente no salão"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Cadastrar Mesa (+1)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const novo = prompt('Quantas mesas seu salão possui?', String(totalMesasConfiguradas));
-                    if (novo && !isNaN(parseInt(novo)) && parseInt(novo) > 0) {
-                      const qtd = parseInt(novo);
-                      setTotalMesasConfiguradas(qtd);
-                      try {
-                        localStorage.setItem('totalMesasLayout', String(qtd));
-                        window.dispatchEvent(new Event('storage'));
-                      } catch {}
-                    }
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#202024] hover:bg-[#28282e] border border-[#29292e] text-zinc-300 hover:text-white text-xs font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                  title="Configurar quantidade total de mesas do salão"
-                >
-                  <span>⚙️ Limite Mesas</span>
-                  <span className="font-mono text-cyan-400">({totalMesasConfiguradas})</span>
-                </button>
-
-                <div className="relative w-full sm:w-56">
-                  <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="Buscar mesa ou cliente..."
-                    value={buscaComanda}
-                    onChange={(e) => setBuscaComanda(e.target.value)}
-                    className="w-full pl-9 pr-3 py-1.5 bg-[#14151e] border border-[#29292e] rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-cyan-400"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* SE MODO FOR GRID VISUAL (QUADRADINHOS DINÂMICOS DO SALÃO) */}
-            {modoVisualSalao === 'quadradinhos' && (
+            {/* QUADRADINHOS DINÂMICOS DO SALÃO (SOMENTE AS MESAS) */}
               <div className="p-5 rounded-2xl bg-[#14151a] border border-[#29292e] shadow-xl space-y-4">
                 {/* Legenda de Cores de Status */}
                 <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-[#29292e]">
@@ -1042,192 +1193,7 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                   })}
                 </div>
               </div>
-            )}
 
-            {/* SE MODO FOR CARDS DETALHADOS (OU COMPLEMENTAR) */}
-            {modoVisualSalao === 'cards' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {comandasFiltradas.length === 0 ? (
-                <div className="col-span-full p-12 text-center rounded-2xl bg-[#1a1a1e] border border-dashed border-[#29292e] text-[#8d8d99]">
-                  <Utensils className="w-10 h-10 mx-auto mb-2 text-zinc-600" />
-                  <p className="font-bold text-white text-base">Nenhuma comanda encontrada</p>
-                  <p className="text-xs mt-1">Clique no botão acima para abrir a primeira comanda ou mesa.</p>
-                </div>
-              ) : (
-                comandasFiltradas.map((cmd) => {
-                  const isAberta = cmd.status === 'aberta' || cmd.status === 'fechando';
-                  const minutosAberto = Math.max(
-                    1,
-                    Math.round((Date.now() - new Date(cmd.abertaEm).getTime()) / 60000)
-                  );
-
-                  return (
-                    <div
-                      key={cmd.id}
-                      className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
-                        cmd.status === 'paga'
-                          ? 'bg-[#151916] border-emerald-900/60 opacity-80'
-                          : isAberta
-                          ? 'bg-[#1a1a1e] border-[#29292e] hover:border-cyan-500/50 shadow-md'
-                          : 'bg-[#1a1a1e] border-[#29292e]'
-                      }`}
-                    >
-                      <div>
-                        {/* Topo do Card */}
-                        <div className="flex items-center justify-between pb-2.5 border-b border-[#29292e]">
-                          <div className="flex items-center gap-2">
-                            <span className="w-8 h-8 rounded-lg bg-cyan-950 text-cyan-300 font-black text-sm flex items-center justify-center border border-cyan-800">
-                              {cmd.tipo === 'mesa' ? `M${cmd.numeroMesa}` : 'B'}
-                            </span>
-                            <div>
-                              <strong className="text-white text-sm block leading-tight font-bold">
-                                {cmd.numeroComanda}
-                              </strong>
-                              <span className="text-[11px] text-[#8d8d99]">
-                                {cmd.tipo === 'mesa' ? `Mesa #${cmd.numeroMesa}` : 'Balcão / Retirada'}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="text-right">
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                cmd.status === 'paga'
-                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                                  : 'bg-amber-950 text-amber-300 border border-amber-800'
-                              }`}
-                            >
-                              {cmd.status === 'paga' ? 'Paga / Fechada' : 'Em Aberto'}
-                            </span>
-                            {isAberta && (
-                              <span className="text-[10px] text-zinc-500 block mt-0.5 flex items-center justify-end gap-1">
-                                <Clock className="w-3 h-3" />
-                                <span>há {minutosAberto}m</span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Dados do Cliente e Garçom */}
-                        <div className="mt-2.5 text-xs space-y-1">
-                          <div className="flex justify-between items-center">
-                            <span className="text-zinc-400">Cliente:</span>
-                            <span className="text-white font-semibold">{cmd.clienteNome}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-zinc-400">Atendente:</span>
-                            <span className="text-zinc-300">{cmd.atendente || 'Geral'}</span>
-                          </div>
-                        </div>
-
-                        {/* Lista dos Itens Lançados */}
-                        <div className="mt-3 p-2.5 rounded-xl bg-[#14151e] border border-[#29292e] max-h-36 overflow-y-auto space-y-1.5">
-                          {cmd.itens.length === 0 ? (
-                            <p className="text-[11px] text-zinc-500 text-center py-2">
-                              Nenhum item lançado ainda.
-                            </p>
-                          ) : (
-                            cmd.itens.map((it) => (
-                              <div
-                                key={it.id}
-                                className="flex items-start justify-between text-[11px] text-zinc-300 group"
-                              >
-                                <div className="pr-2">
-                                  <span className="font-bold text-white">{it.quantidade}x</span> {it.nome}
-                                  {it.adicionais && it.adicionais.length > 0 && (
-                                    <span className="text-[10px] text-cyan-400 block">
-                                      {it.adicionais.join(', ')}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className="font-mono text-zinc-200">
-                                    R$ {(it.preco * it.quantidade).toFixed(2).replace('.', ',')}
-                                  </span>
-                                  {isAberta && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoverItemComanda(cmd.id, it.id)}
-                                      className="text-zinc-500 hover:text-red-400 opacity-60 group-hover:opacity-100 transition-opacity p-0.5"
-                                      title="Remover item"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-
-                        {/* Total Acumulado */}
-                        <div className="mt-3 flex items-center justify-between pt-2 border-t border-[#29292e]">
-                          <span className="text-xs text-zinc-400">Total Consumido:</span>
-                          <span className="text-lg font-black text-[#00b37e] tabular-nums font-mono">
-                            R$ {(cmd.total || 0).toFixed(2).replace('.', ',')}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Botões de Ação da Comanda */}
-                      <div className="mt-4 pt-2.5 border-t border-[#29292e] flex items-center gap-1.5">
-                        {isAberta ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setComandaSelecionadaId(cmd.id);
-                                setSubAba('lancar');
-                              }}
-                              className="flex-1 py-2 px-2 rounded-lg bg-[#202024] hover:bg-[#28282e] border border-[#29292e] hover:border-cyan-500/50 text-cyan-300 text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>Lançar</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleImprimirCozinha(cmd)}
-                              disabled={!cmd.itens.length || imprimindoSerial}
-                              title="Imprimir cupom para chapa/cozinha direto na impressora térmica USB"
-                              className="py-2 px-2.5 rounded-lg bg-orange-950/70 hover:bg-orange-900 border border-orange-700/60 text-orange-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
-                            >
-                              <Printer className="w-3.5 h-3.5 text-orange-400" />
-                              <span className="hidden sm:inline">Cozinha</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setComandaSelecionadaId(cmd.id);
-                                setSubAba('caixa');
-                              }}
-                              className="flex-1 py-2 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer"
-                            >
-                              <DollarSign className="w-3.5 h-3.5" />
-                              <span>Fechar Caixa</span>
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setComandaRecibo(cmd);
-                              setReciboModalAberto(true);
-                            }}
-                            className="w-full py-2 px-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <Receipt className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Ver Recibo / Comprovante</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-            )}
           </div>
         )}
 
@@ -1264,8 +1230,10 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                     .filter((c) => c.status === 'aberta' || c.status === 'fechando')
                     .map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.numeroComanda} - {c.clienteNome} ({c.itens.length} itens - R${' '}
-                        {c.total.toFixed(2)})
+                        {c.tipo === 'mesa'
+                          ? `Mesa ${String(c.numeroMesa || c.numeroComanda).replace(/\D/g, '').padStart(2, '0') || '01'}`
+                          : `${c.numeroComanda} - ${c.clienteNome}`}{' '}
+                        ({c.itens.length} itens - R$ {c.total.toFixed(2)})
                       </option>
                     ))}
                 </select>
@@ -1381,7 +1349,9 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                           Comanda Atual
                         </span>
                         <h3 className="font-black text-white text-base">
-                          {comandaAtual.numeroComanda} • {comandaAtual.clienteNome}
+                          {comandaAtual.tipo === 'mesa'
+                            ? `Mesa ${String(comandaAtual.numeroMesa || comandaAtual.numeroComanda).replace(/\D/g, '').padStart(2, '0') || '01'}`
+                            : `${comandaAtual.numeroComanda} • ${comandaAtual.clienteNome}`}
                         </h3>
                         <span className="text-[11px] text-[#8d8d99]">
                           Atendente: {comandaAtual.atendente || 'Geral'}
@@ -1459,7 +1429,13 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
 
                       <button
                         type="button"
-                        onClick={() => setSubAba('caixa')}
+                        onClick={() => {
+                          if (onNavigateToCaixa) {
+                            onNavigateToCaixa(comandaAtual.id);
+                          } else {
+                            setSubAba('caixa');
+                          }
+                        }}
                         className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all"
                       >
                         <DollarSign className="w-4 h-4" />
@@ -1507,7 +1483,10 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                     .filter((c) => c.status === 'aberta' || c.status === 'fechando')
                     .map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.numeroComanda} - {c.clienteNome} (R$ {c.total.toFixed(2)})
+                        {c.tipo === 'mesa'
+                          ? `Mesa ${String(c.numeroMesa || c.numeroComanda).replace(/\D/g, '').padStart(2, '0') || '01'}`
+                          : `${c.numeroComanda} - ${c.clienteNome}`}{' '}
+                        (R$ {c.total.toFixed(2)})
                       </option>
                     ))}
                 </select>
@@ -1523,7 +1502,9 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                       Resumo da Comanda
                     </span>
                     <h3 className="text-lg font-black text-white">
-                      {comandaAtual.numeroComanda} • {comandaAtual.clienteNome}
+                      {comandaAtual.tipo === 'mesa'
+                        ? `Mesa ${String(comandaAtual.numeroMesa || comandaAtual.numeroComanda).replace(/\D/g, '').padStart(2, '0') || '01'}`
+                        : `${comandaAtual.numeroComanda} • ${comandaAtual.clienteNome}`}
                     </h3>
                     <span className="text-xs text-[#8d8d99]">
                       Atendido por: {comandaAtual.atendente || 'Geral'}
@@ -1766,10 +1747,13 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                 </p>
                 <button
                   type="button"
-                  onClick={() => setSubAba('salao')}
+                  onClick={() => {
+                    if (onNavigateToControleMesa) onNavigateToControleMesa();
+                    else setSubAba('salao');
+                  }}
                   className="px-4 py-2 bg-cyan-500 text-black text-xs font-bold rounded-lg cursor-pointer hover:bg-cyan-400 transition-colors"
                 >
-                  Voltar ao Salão & Mesas
+                  Voltar para Controle de Mesa
                 </button>
               </div>
             )}
@@ -1996,17 +1980,29 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                 </div>
               )}
 
-              {/* Nome do Cliente */}
-              <div>
-                <label className="block text-zinc-300 font-bold mb-1">Nome do Cliente:</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Lucas Silva, Família Santos..."
-                  value={novoCliente}
-                  onChange={(e) => setNovoCliente(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-black border border-[#29292e] rounded-xl text-white text-sm focus:outline-hidden focus:border-cyan-400"
-                />
-              </div>
+              {/* Identificação: Somente Mesa para salão ou Nome para Balcão */}
+              {novoTipo === 'mesa' ? (
+                <div className="p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-xl text-zinc-300 text-xs flex items-center gap-2.5">
+                  <span className="text-lg">🪑</span>
+                  <div>
+                    <span className="font-bold text-white block">Atendimento por Mesa</span>
+                    <span className="text-zinc-400 text-[11px]">
+                      Identificação direta como <strong className="text-cyan-400">Mesa {String(novoNumeroMesa).padStart(2, '0')}</strong> (sem vincular nome de cliente).
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-zinc-300 font-bold mb-1">Identificação / Cliente Balcão:</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Cliente Balcão, Lucas, Senha 42..."
+                    value={novoCliente}
+                    onChange={(e) => setNovoCliente(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-black border border-[#29292e] rounded-xl text-white text-sm focus:outline-hidden focus:border-cyan-400"
+                  />
+                </div>
+              )}
 
               {/* Atendente / Garçom */}
               <div className="grid grid-cols-2 gap-3">
@@ -2116,37 +2112,44 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                 </div>
               </div>
 
-              {/* Sugestões de Adicionais */}
+              {/* Sugestões de Adicionais com Preço */}
               <div>
-                <span className="font-bold text-zinc-300 block mb-2">Adicionais Opcionais:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    '+ Bacon Crocante Extra',
-                    '+ Cheddar Cremoso',
-                    '+ Burger Extra 160g',
-                    '+ Queijo Prato Derretido',
-                    '+ Maionese Verde',
-                    '+ Cebola Crispy',
-                  ].map((adc) => {
-                    const selecionado = adicionaisLancar.includes(adc);
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-bold text-zinc-300 text-xs">Adicionais Extras Opcionais:</span>
+                  {somaAdicionaisLancar > 0 && (
+                    <span className="text-[11px] text-cyan-400 font-mono font-bold">
+                      + R$ {somaAdicionaisLancar.toFixed(2).replace('.', ',')} / un
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                  {listaAdicionaisDisponiveis.map((adc) => {
+                    const selecionado = adicionaisLancar.some((a) => a.name === adc.name);
                     return (
                       <button
-                        key={adc}
+                        key={adc.id || adc.name}
                         type="button"
                         onClick={() => {
                           if (selecionado) {
-                            setAdicionaisLancar((prev) => prev.filter((a) => a !== adc));
+                            setAdicionaisLancar((prev) => prev.filter((a) => a.name !== adc.name));
                           } else {
                             setAdicionaisLancar((prev) => [...prev, adc]);
                           }
                         }}
-                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border ${
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
                           selecionado
-                            ? 'bg-cyan-500 text-black border-cyan-400 font-bold'
-                            : 'bg-[#14151e] text-zinc-300 border-[#29292e] hover:border-zinc-700'
+                            ? 'bg-cyan-500 text-black border-cyan-400 font-bold shadow-md'
+                            : 'bg-[#14151e] text-zinc-300 border-[#29292e] hover:border-zinc-700 hover:text-white'
                         }`}
                       >
-                        {adc}
+                        <span>{adc.name.startsWith('+') ? adc.name : `+ ${adc.name}`}</span>
+                        <span
+                          className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded ${
+                            selecionado ? 'bg-black/25 text-black' : 'bg-black/40 text-cyan-400'
+                          }`}
+                        >
+                          + R$ {adc.price.toFixed(2).replace('.', ',')}
+                        </span>
                       </button>
                     );
                   })}
@@ -2165,11 +2168,17 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                 />
               </div>
 
-              {/* Total do Item com Quantidade */}
-              <div className="p-3 rounded-xl bg-black/40 border border-[#29292e] flex items-center justify-between">
-                <span className="text-zinc-400 font-bold">Total do Lançamento:</span>
-                <span className="font-mono text-base font-black text-[#00b37e]">
-                  R$ {(itemSelecionadoParaLancar.price * qtdLancar).toFixed(2).replace('.', ',')}
+              {/* Total do Item com Quantidade e Adicionais Somados em Tempo Real */}
+              <div className="p-3.5 rounded-xl bg-black/40 border border-[#29292e] flex items-center justify-between">
+                <div>
+                  <span className="text-zinc-400 font-bold block text-xs">Total do Lançamento:</span>
+                  <span className="text-[11px] text-zinc-500 font-mono">
+                    {qtdLancar}x (R$ {itemSelecionadoParaLancar.price.toFixed(2).replace('.', ',')} base
+                    {somaAdicionaisLancar > 0 ? ` + R$ ${somaAdicionaisLancar.toFixed(2).replace('.', ',')} adic.` : ''})
+                  </span>
+                </div>
+                <span className="font-mono text-lg font-black text-[#00b37e]">
+                  R$ {totalLancamentoItem.toFixed(2).replace('.', ',')}
                 </span>
               </div>
 
@@ -2435,21 +2444,13 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
             {/* Formulário de Lançamento */}
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-zinc-300 mb-1">Nome do Cliente na Mesa:</label>
-                <input
-                  type="text"
-                  placeholder={`Ex: Cliente Mesa ${mesaVisualNum}`}
-                  value={nomeClienteMesaVisual}
-                  onChange={(e) => setNomeClienteMesaVisual(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#202024] border border-[#29292e] rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-cyan-400"
-                />
-              </div>
-
-              <div>
                 <label className="block text-xs font-bold text-zinc-300 mb-1">Selecione o Hambúrguer / Produto:</label>
                 <select
                   value={produtoMesaVisual}
-                  onChange={(e) => setProdutoMesaVisual(e.target.value)}
+                  onChange={(e) => {
+                    setProdutoMesaVisual(e.target.value);
+                    setAdicionaisMesaVisual([]);
+                  }}
                   className="w-full px-3.5 py-2.5 bg-[#202024] border border-[#29292e] rounded-xl text-xs text-white focus:outline-hidden focus:border-cyan-400"
                 >
                   <option value="">Selecione um item do cardápio...</option>
@@ -2461,6 +2462,48 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                 </select>
               </div>
 
+              {/* Seleção de Adicionais Opcionais no Lançamento Rápido da Mesa */}
+              {produtoMesaVisual && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-zinc-300">Turbinar com Adicionais Extras:</label>
+                    {adicionaisMesaVisual.length > 0 && (
+                      <span className="text-[11px] text-cyan-400 font-mono font-bold">
+                        + R$ {adicionaisMesaVisual.reduce((acc, a) => acc + (Number(a.price) || 0), 0).toFixed(2).replace('.', ',')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-1.5 rounded-xl bg-black/40 border border-[#29292e]">
+                    {DEFAULT_ADICIONAIS.map((adc) => {
+                      const isSel = adicionaisMesaVisual.some((a) => a.name === adc.name);
+                      return (
+                        <button
+                          key={adc.id}
+                          type="button"
+                          onClick={() => {
+                            if (isSel) {
+                              setAdicionaisMesaVisual((prev) => prev.filter((a) => a.name !== adc.name));
+                            } else {
+                              setAdicionaisMesaVisual((prev) => [...prev, adc]);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border flex items-center gap-1 ${
+                            isSel
+                              ? 'bg-cyan-500 text-black border-cyan-400 font-bold shadow-md'
+                              : 'bg-[#18181c] text-zinc-300 border-[#2e2e38] hover:border-zinc-500'
+                          }`}
+                        >
+                          <span>{adc.name}</span>
+                          <span className={`text-[10px] font-mono ${isSel ? 'text-black' : 'text-cyan-400'}`}>
+                            +R${adc.price.toFixed(2).replace('.', ',')}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Botão de Disparo para a Cozinha */}
               <button
                 type="button"
@@ -2471,8 +2514,15 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                   }
 
                   const [, nomeItem, precoItemStr] = produtoMesaVisual.split('|');
-                  const precoItem = parseFloat(precoItemStr) || 0;
-                  const nomeCliente = nomeClienteMesaVisual.trim() || `Mesa ${mesaVisualNum}`;
+                  const precoItemBase = parseFloat(precoItemStr) || 0;
+                  const somaAdicsMesa = adicionaisMesaVisual.reduce((acc, a) => acc + (Number(a.price) || 0), 0);
+                  const precoItemTotal = precoItemBase + somaAdicsMesa; // 🚨 SOMA O VALOR DO ADICIONAL!
+
+                  const adicionaisTxt = adicionaisMesaVisual.map(
+                    (a) => `${a.name.startsWith('+') ? a.name : `+ ${a.name}`} (R$ ${(Number(a.price) || 0).toFixed(2).replace('.', ',')})`
+                  );
+
+                  const nomeCliente = `Mesa ${String(mesaVisualNum).padStart(2, '0')}`;
 
                   const comandaExistente = comandas.find(
                     (cmd) => cmd.tipo === 'mesa' && cmd.numeroMesa === mesaVisualNum && (cmd.status === 'aberta' || cmd.status === 'fechando')
@@ -2484,8 +2534,9 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                       id: `it-${Date.now()}`,
                       itemId: `pr-${Date.now()}`,
                       nome: nomeItem,
-                      preco: precoItem,
+                      preco: precoItemTotal, // 🚨 Preço completo somado!
                       quantidade: 1,
+                      adicionais: adicionaisTxt.length > 0 ? adicionaisTxt : undefined,
                       horaLancamento: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
                     };
 
@@ -2509,7 +2560,7 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                         tipo: 'mesa',
                         mesa: mesaVisualNum,
                         cliente: nomeCliente,
-                        itens: [`1x ${nomeItem}`],
+                        itens: [adicionaisTxt.length > 0 ? `1x ${nomeItem} [${adicionaisTxt.join(', ')}]` : `1x ${nomeItem}`],
                         total: novoSub,
                       });
                     } catch {}
@@ -2536,14 +2587,15 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                           id: `it-${Date.now()}`,
                           itemId: `pr-${Date.now()}`,
                           nome: nomeItem,
-                          preco: precoItem,
+                          preco: precoItemTotal, // 🚨 Preço completo somado!
                           quantidade: 1,
+                          adicionais: adicionaisTxt.length > 0 ? adicionaisTxt : undefined,
                           horaLancamento: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
                         },
                       ],
                       status: 'aberta',
-                      subtotal: precoItem,
-                      total: precoItem,
+                      subtotal: precoItemTotal,
+                      total: precoItemTotal,
                       abertaEm: new Date().toISOString(),
                     };
 
@@ -2556,8 +2608,8 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                         tipo: 'mesa',
                         mesa: mesaVisualNum,
                         cliente: nomeCliente,
-                        itens: [`1x ${nomeItem}`],
-                        total: precoItem,
+                        itens: [adicionaisTxt.length > 0 ? `1x ${nomeItem} [${adicionaisTxt.join(', ')}]` : `1x ${nomeItem}`],
+                        total: precoItemTotal,
                       });
                     } catch {}
 
@@ -2574,8 +2626,8 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                       tipo: 'mesa',
                       mesa: mesaVisualNum,
                       numeroMesa: mesaVisualNum,
-                      itens: [`1x ${nomeItem}`],
-                      total: precoItem,
+                      itens: [adicionaisTxt.length > 0 ? `1x ${nomeItem} [${adicionaisTxt.join(', ')}]` : `1x ${nomeItem}`],
+                      total: precoItemTotal,
                       status: 'pendente',
                       criadoEm: new Date().toISOString(),
                     });
@@ -2602,7 +2654,11 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
                     onClick={() => {
                       setComandaSelecionadaId(c.id);
                       setModalMesaVisualAberta(false);
-                      setSubAba('caixa');
+                      if (onNavigateToCaixa) {
+                        onNavigateToCaixa(c.id);
+                      } else {
+                        setSubAba('caixa');
+                      }
                     }}
                     className="w-full py-2.5 px-4 rounded-xl bg-transparent border border-[#00b37e] hover:bg-[#00b37e]/15 text-[#00b37e] font-extrabold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
                   >

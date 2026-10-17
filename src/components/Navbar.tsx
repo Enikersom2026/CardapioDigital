@@ -12,11 +12,14 @@ import {
   LayoutDashboard,
   DollarSign,
   Package,
+  CreditCard,
+  TrendingUp,
 } from 'lucide-react';
+import { AppTab } from '../App';
 
 interface NavbarProps {
-  activeTab: 'painel' | 'atendimento' | 'logistica' | 'entregador' | 'mesas' | 'admin' | 'preview' | 'delivery' | 'ideas' | 'export';
-  setActiveTab: (tab: 'painel' | 'atendimento' | 'logistica' | 'entregador' | 'mesas' | 'admin' | 'preview' | 'delivery' | 'ideas' | 'export') => void;
+  activeTab: AppTab;
+  setActiveTab: (tab: AppTab) => void;
   painelSubTab?: 'dashboard' | 'vendas' | 'financeiro' | 'estoque';
   onSelectPainelSubTab?: (subTab: 'dashboard' | 'vendas' | 'financeiro' | 'estoque') => void;
   menuCount: number;
@@ -76,7 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   Dom <span className="text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">Gabriel</span>
                 </span>
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800">
-                  {userRole === 'admin' ? 'Admin' : userRole === 'entregador' ? '🛵 Entregador' : 'Cliente'}
+                  {userRole === 'admin' ? 'Admin' : userRole === 'entregador' ? 'Entregador' : 'Cliente'}
                 </span>
               </div>
               <span className="text-xs text-zinc-400 hidden sm:block">
@@ -104,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }`}
                     title="Clique para abrir Painel Geral, Vendas & Histórico, Financeiro & Métricas"
                   >
-                    <span>📊 Painel Geral</span>
+                    <span>Painel Geral</span>
                     <ChevronDown
                       className={`w-3.5 h-3.5 transition-transform duration-200 ${
                         dropdownPainelAberto ? 'rotate-180' : ''
@@ -202,7 +205,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   )}
                 </div>
 
-                {/* Nova Aba Solicitada: Atendimento no Local (Abertura, Comanda & Caixa) */}
+                {/* Controle de Mesa */}
                 <button
                   type="button"
                   onClick={() => {
@@ -214,10 +217,43 @@ export const Navbar: React.FC<NavbarProps> = ({
                       ? 'bg-cyan-400 text-black shadow-[0_0_15px_rgba(34,211,238,0.5)]'
                       : 'text-zinc-400 hover:text-cyan-300 hover:bg-zinc-900'
                   }`}
-                  title="Atendimento no Local: Abertura de Mesas, Lançar Comandas e Frente de Caixa (PDV)"
+                  title="Controle de Mesa: Abertura e gestão de comandas e consumo por mesa"
                 >
-                  <Utensils className="w-4 h-4" />
-                  <span>🍽️ Atendimento Local & Caixa</span>
+                  <span>Controle de Mesa</span>
+                </button>
+
+                {/* Frente de Caixa */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('caixa');
+                    setDropdownPainelAberto(false);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                    activeTab === 'caixa'
+                      ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+                      : 'text-zinc-400 hover:text-emerald-300 hover:bg-zinc-900'
+                  }`}
+                  title="Frente de Caixa (PDV): Fechamento de Comandas e Pagamentos"
+                >
+                  <span>Frente de Caixa</span>
+                </button>
+
+                {/* Caixa do Dia */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('caixa_dia');
+                    setDropdownPainelAberto(false);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                    activeTab === 'caixa_dia'
+                      ? 'bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]'
+                      : 'text-zinc-400 hover:text-amber-300 hover:bg-zinc-900'
+                  }`}
+                  title="Caixa do Dia: Fluxo Financeiro, Sangrias e Suprimentos"
+                >
+                  <span>Caixa do Dia</span>
                 </button>
 
                 <button
@@ -232,7 +268,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                   title="Monitor de Delivery & Despacho"
                 >
-                  <Truck className="w-4 h-4" />
                   <span>Logística</span>
                 </button>
               </>
@@ -248,7 +283,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                       : 'text-zinc-400 hover:text-cyan-300 hover:bg-zinc-900'
                   }`}
                 >
-                  <Utensils className="w-4 h-4" />
                   <span className="hidden sm:inline">Editor Menu</span>
                   <span
                     className={`text-xs px-1.5 py-0.2 rounded-full tabular-nums font-mono ${

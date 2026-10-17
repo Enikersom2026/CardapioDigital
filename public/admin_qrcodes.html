@@ -3,160 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tags de Mesa e QR Code | Dom Gabriel Hamburgueria</title>
+    <title>Imprimir QR Codes de Mesa | Dom Gabriel</title>
+    <!-- Biblioteca de QR Code -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background-color: #0f0f12; color: white; padding: 20px; }
-
-        header { border-bottom: 1px solid #29292e; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-        header h1 { font-size: 22px; color: #ff4b2b; display: flex; align-items: center; gap: 8px; }
-        
-        .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .btn { background: #29292e; color: white; border: 1px solid #3e3e46; padding: 9px 15px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
-        .btn:hover { background: #383842; border-color: #ff4b2b; }
-        .btn-primary { background: #ff4b2b; border-color: #ff4b2b; color: white; }
-        .btn-primary:hover { background: #e03d1f; }
-        .btn-success { background: #00b37e; border-color: #00b37e; color: white; }
-        .btn-success:hover { background: #008f64; }
-
-        /* Barra de Controle */
-        .painel-controles { background: #1a1a1e; border: 1px solid #29292e; border-radius: 16px; padding: 20px; margin-bottom: 25px; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
-        .campo-ctrl { flex: 1; min-width: 200px; }
-        .campo-ctrl label { display: block; font-size: 12px; color: #8d8d99; font-weight: 600; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
-        .campo-ctrl input { width: 100%; padding: 10px 14px; background: #202024; border: 1px solid #29292e; color: white; border-radius: 8px; font-size: 14px; }
-        .campo-ctrl input:focus { outline: none; border-color: #ff4b2b; }
-
-        /* Grid de Exibição das Tags */
-        .grid-tags { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
-
-        /* Card da Tag de Mesa (Imprimível) */
-        .card-tag-mesa { background: #ffffff; color: #111111; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; align-items: center; text-align: center; border: 2px solid #e1e1e6; box-shadow: 0 4px 15px rgba(0,0,0,0.4); position: relative; transition: 0.2s; }
-        .card-tag-mesa:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.6); }
-
-        .tag-cabecalho { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #555; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
-        .tag-restaurante { font-size: 14px; font-weight: 900; color: #ff4b2b; text-transform: uppercase; margin-bottom: 12px; }
-        .tag-numero-mesa { font-size: 32px; font-weight: 900; color: #000; line-height: 1; margin-bottom: 12px; background: #f0f0f4; padding: 6px 18px; border-radius: 30px; border: 1px solid #ddd; }
-        
-        .tag-qr-box { background: #fff; padding: 10px; border-radius: 10px; border: 1px solid #e1e1e6; margin-bottom: 12px; display: flex; justify-content: center; align-items: center; }
-        
-        .tag-instrucao { font-size: 12px; font-weight: 700; color: #222; margin-bottom: 4px; line-height: 1.3; }
-        .tag-subinstrucao { font-size: 10px; color: #666; margin-bottom: 12px; line-height: 1.3; }
-        
-        .tag-acoes-btn { display: flex; gap: 8px; width: 100%; border-top: 1px dashed #ddd; padding-top: 12px; }
-        .btn-mini { flex: 1; padding: 6px 8px; font-size: 11px; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; border: 1px solid #ccc; background: #f4f4f7; color: #333; transition: 0.15s; }
-        .btn-mini:hover { background: #e0e0e6; border-color: #999; }
-
-        /* Estilos de Impressão */
+        body { background-color: #0f0f12; color: white; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        header { width: 100%; max-width: 800px; border-bottom: 1px solid #29292e; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 20px; color: #ff4b2b; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+        .painel-config { background: #1a1a1e; border: 1px solid #29292e; padding: 20px; border-radius: 16px; width: 100%; max-width: 800px; margin-bottom: 25px; }
+        .config-grid { display: flex; gap: 16px; flex-wrap: wrap; }
+        .config-col-link { flex: 2; min-width: 240px; }
+        .config-col-qtd { flex: 1; min-width: 140px; }
+        label { display: block; font-size: 13px; color: #c4c4cc; margin-bottom: 6px; font-weight: 600; }
+        input { width: 100%; padding: 12px; border: 1px solid #29292e; background: #202024; color: white; border-radius: 8px; font-size: 14px; margin-top: 5px; outline: none; transition: 0.2s; }
+        input:focus { border-color: #ff4b2b; }
+        .btn-imprimir { background: #00b37e; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-imprimir:hover { background: #008f64; }
+        .grid-tags { width: 100%; max-width: 800px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .card-tag { background: #ffffff; color: #111; padding: 25px 20px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; text-align: center; border: 2px dashed #ff4b2b; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .titulo-mesa { font-size: 24px; font-weight: 800; margin-bottom: 10px; color: #111; }
+        .qr-placeholder { background: #f8f9fa; padding: 10px; border-radius: 12px; border: 1px solid #eee; display: flex; justify-content: center; align-items: center; min-width: 130px; min-height: 130px; }
+        .qr-placeholder img, .qr-placeholder canvas { display: block; width: 130px; height: 130px; }
+        .instrucao { font-size: 12px; font-weight: 600; margin-top: 15px; color: #333; line-height: 1.4; }
         @media print {
-            body { background: white !important; color: black !important; padding: 0 !important; }
-            header, .painel-controles, .tag-acoes-btn, .header-actions { display: none !important; }
-            .grid-tags { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 15px !important; margin: 0 !important; padding: 0 !important; }
-            .card-tag-mesa { page-break-inside: avoid; border: 2px dashed #666 !important; box-shadow: none !important; margin-bottom: 15px; }
+            header, .painel-config { display: none !important; }
+            body { background: white !important; color: #000 !important; padding: 0 !important; }
+            .grid-tags { display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 20px !important; width: 100% !important; }
+            .card-tag { box-shadow: none !important; border: 2px dashed #111 !important; page-break-inside: avoid !important; break-inside: avoid !important; }
         }
     </style>
 </head>
 <body>
-
     <header>
-        <div>
-            <h1>📐 Tags de Mesa & Gerador de QR Code</h1>
-            <p style="font-size: 13px; color: #8d8d99; margin-top: 4px;">Dom Gabriel • Atendimento Digital Sem Garçom</p>
-        </div>
-        <div class="header-actions">
-            <button class="btn btn-success" onclick="window.print()">🖨️ Imprimir Todas as Tags (A4)</button>
-            <a href="/admin_painel_mesas.html" class="btn">🍽️ Painel de Salão</a>
-            <a href="/" class="btn">🏠 Voltar ao App</a>
-        </div>
+        <h1>🖨️ Central de Impressão de QR Codes</h1>
+        <button class="btn-imprimir" onclick="window.print()">Mandar para Impressora</button>
     </header>
-
-    <div class="painel-controles">
-        <div class="campo-ctrl" style="max-width: 160px;">
-            <label>Qtd. de Mesas:</label>
-            <input type="number" id="inputQtdMesas" min="1" max="100" value="15" onchange="gerarTodasAsTags()">
-        </div>
-        <div class="campo-ctrl">
-            <label>Link Base do Cardápio:</label>
-            <input type="text" id="inputUrlBase" onchange="gerarTodasAsTags()">
-        </div>
-        <div style="display: flex; gap: 10px;">
-            <button class="btn btn-primary" onclick="gerarTodasAsTags()">🔄 Atualizar Tags</button>
-            <button class="btn" onclick="adicionarMaisUmaMesa()">➕ +1 Mesa</button>
+    <div class="painel-config">
+        <div class="config-grid">
+            <div class="config-col-link">
+                <label>Link do seu Cardápio (URL do Firebase Hosting / Web App):</label>
+                <input type="text" id="linkApp" value="" oninput="gerarTagsMesa()" placeholder="https://web.app/cardapio.html">
+            </div>
+            <div class="config-col-qtd">
+                <label>Quantidade de Mesas:</label>
+                <input type="number" id="qtdMesasInput" value="15" min="1" max="60" oninput="salvarEQtdMesas(this.value)">
+            </div>
         </div>
     </div>
-
-    <main class="grid-tags" id="containerGridTags">
-        <!-- Renderizado dinamicamente via JS -->
-    </main>
+    <main class="grid-tags" id="wrapperTags"></main>
 
 <script>
-    // Inicialização da URL base
-    const urlPadrao = `${window.location.origin}/cardapio.html`;
-    document.getElementById('inputUrlBase').value = urlPadrao;
+    function salvarEQtdMesas(val) {
+        const n = parseInt(val) || 15;
+        localStorage.setItem('totalMesasLayout', n);
+        gerarTagsMesa();
+    }
 
-    // Recupera a quantidade salva
-    const qtdSalva = parseInt(localStorage.getItem('totalMesasLayout')) || 15;
-    document.getElementById('inputQtdMesas').value = qtdSalva;
-
-    function gerarTodasAsTags() {
-        const qtd = parseInt(document.getElementById('inputQtdMesas').value) || 15;
-        localStorage.setItem('totalMesasLayout', qtd);
-        const urlBase = document.getElementById('inputUrlBase').value.trim() || urlPadrao;
-
-        const container = document.getElementById('containerGridTags');
+    function gerarTagsMesa() {
+        const container = document.getElementById('wrapperTags');
+        let urlBase = document.getElementById('linkApp').value.trim();
+        if (!urlBase) {
+            urlBase = `${window.location.origin}/cardapio.html`;
+        }
+        const totalMesas = parseInt(document.getElementById('qtdMesasInput').value) || parseInt(localStorage.getItem('totalMesasLayout')) || 15;
         container.innerHTML = '';
 
-        for (let i = 1; i <= qtd; i++) {
-            const numMesaStr = String(i).padStart(2, '0');
-            const urlFinal = `${urlBase}?mesa=${i}`;
+        const separador = urlBase.includes('?') ? '&' : '?';
 
+        for (let i = 1; i <= totalMesas; i++) {
             const card = document.createElement('div');
-            card.className = 'card-tag-mesa';
+            card.className = 'card-tag';
             card.innerHTML = `
-                <div class="tag-cabecalho">🔥 CARDÁPIO DIGITAL</div>
-                <div class="tag-restaurante">DOM GABRIEL</div>
-                <div class="tag-numero-mesa">MESA ${numMesaStr}</div>
-                <div class="tag-qr-box" id="qrcode-mesa-${i}"></div>
-                <div class="tag-instrucao">Aponte a câmera do seu celular</div>
-                <div class="tag-subinstrucao">Faça seu pedido diretamente da mesa sem filas ou espera!</div>
-                <div class="tag-acoes-btn">
-                    <a href="${urlFinal}" target="_blank" class="btn-mini">🧪 Testar</a>
-                    <button class="btn-mini" onclick="copiarLink('${urlFinal}')">📋 Copiar Link</button>
-                </div>
+                <div class="titulo-mesa">MESA ${String(i).padStart(2, '0')}</div>
+                <div class="qr-placeholder" id="qr-mesa-${i}"></div>
+                <p class="instrucao">Aponte a câmera do celular<br>e faça seu pedido direto!</p>
             `;
             container.appendChild(card);
 
-            // Gera o QR Code com a biblioteca qrcodejs
-            setTimeout(() => {
-                const boxQr = document.getElementById(`qrcode-mesa-${i}`);
-                if (boxQr) {
-                    boxQr.innerHTML = '';
-                    new QRCode(boxQr, {
-                        text: urlFinal,
-                        width: 140,
-                        height: 140,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.H
+            const linkCompleto = `${urlBase}${separador}mesa=${i}`;
+            const qrHolder = document.getElementById(`qr-mesa-${i}`);
+
+            if (typeof QRCode !== 'undefined') {
+                try {
+                    new QRCode(qrHolder, {
+                        text: linkCompleto,
+                        width: 130,
+                        height: 130,
+                        correctLevel : QRCode.CorrectLevel.H
                     });
+                } catch (e) {
+                    qrHolder.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(linkCompleto)}" alt="QR Mesa ${i}" />`;
                 }
-            }, 20);
+            } else {
+                qrHolder.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(linkCompleto)}" alt="QR Mesa ${i}" />`;
+            }
         }
     }
 
-    function adicionarMaisUmaMesa() {
-        const campo = document.getElementById('inputQtdMesas');
-        campo.value = parseInt(campo.value || 15) + 1;
-        gerarTodasAsTags();
-    }
-
-    function copiarLink(link) {
-        navigator.clipboard.writeText(link).then(() => {
-            alert(`Link copiado com sucesso:\n${link}`);
-        });
-    }
-
-    document.addEventListener("DOMContentLoaded", gerarTodasAsTags);
+    document.addEventListener("DOMContentLoaded", () => {
+        const inputUrl = document.getElementById('linkApp');
+        if (inputUrl && !inputUrl.value) {
+            inputUrl.value = `${window.location.origin}/cardapio.html`;
+        }
+        const inputQtd = document.getElementById('qtdMesasInput');
+        const mesasSalvas = parseInt(localStorage.getItem('totalMesasLayout')) || 15;
+        if (inputQtd) {
+            inputQtd.value = mesasSalvas;
+        }
+        gerarTagsMesa();
+    });
 </script>
 </body>
 </html>

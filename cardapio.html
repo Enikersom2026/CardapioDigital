@@ -118,10 +118,10 @@
       </div>
     </div>
     <div class="flex items-center gap-2">
-      <a href="/carrinho.html" class="px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-cyan-300 font-extrabold text-xs border border-cyan-500/30 transition-all flex items-center gap-1">
+      <a href="/carrinho.html" onclick="event.preventDefault(); window.irParaOCarrinho();" class="px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-cyan-300 font-extrabold text-xs border border-cyan-500/30 transition-all flex items-center gap-1 cursor-pointer">
         🛒 Carrinho
       </a>
-      <button onclick="abrirModalSacola()" class="px-4 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs transition-all shadow-[0_0_15px_rgba(34,211,238,0.6)] cursor-pointer flex items-center gap-1.5">
+      <button onclick="window.irParaOCarrinho()" class="px-4 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs transition-all shadow-[0_0_15px_rgba(34,211,238,0.6)] cursor-pointer flex items-center gap-1.5">
         <span>Finalizar</span> ➔
       </button>
     </div>
@@ -262,32 +262,28 @@
 
   <!-- SCRIPT ENGINE DO CARDÁPIO & LEITURA DE QR CODE -->
   <script type="module">
-// --- ENGENHARIA DE LEITURA DE QR CODE (ADICIONE NA CARDAPIO.HTML) ---
+// --- LOGICA DE QR CODE DA ZOE ---
 document.addEventListener("DOMContentLoaded", () => {
-    // Captura as informações de parâmetros da URL (Ex: ?mesa=5)
-    const parametrosUrl = new URLSearchParams(window.location.search);
-    const numeroMesaQrCode = parametrosUrl.get('mesa');
+    const parametros = new URLSearchParams(window.location.search);
+    const mesaEscaneada = parametros.get('mesa');
 
-    if (numeroMesaQrCode) {
-        // Se o cliente leu o QR Code na mesa física:
-        console.log(`Cliente escaneou o QR Code da Mesa: ${numeroMesaQrCode}`);
-        
-        // Bloqueia e força o aplicativo a rodar em Modo Mesa fixo, ocultando o Delivery
+    if (mesaEscaneada) {
+        // Salva a mesa na memória para usar na hora de fechar a conta
+        localStorage.setItem('mesaAtivaQrCode', mesaEscaneada);
+        localStorage.setItem('numeroMesaFixoDoQrCode', mesaEscaneada);
         localStorage.setItem('modoPedido', 'mesa');
+        
+        // Esconde o seletor de delivery
+        const seletorModo = document.querySelector('.wrapper-modo');
+        if(seletorModo) seletorModo.style.display = 'none';
+
+        // Atualiza o topo do OlaClick
+        const topoTitulo = document.querySelector('header h1');
+        if(topoTitulo) topoTitulo.innerText = `Dom Gabriel | Mesa ${String(mesaEscaneada).padStart(2, '0')} 🪑`;
+
         if (window.trocarModoOla) {
             window.trocarModoOla('mesa');
         }
-        
-        // Esconde o seletor de "Mesa ou Delivery" para o cliente não se confundir
-        const wrapperModo = document.querySelector('.wrapper-modo');
-        if (wrapperModo) wrapperModo.style.display = 'none';
-
-        // Altera o título de boas-vindas do topo do OlaClick
-        const headerTitulo = document.querySelector('header h1');
-        if (headerTitulo) headerTitulo.innerText = `Dom Gabriel | Mesa ${String(numeroMesaQrCode).padStart(2, '0')} 🪑`;
-        
-        // Guarda o número da mesa fixo na memória do carrinho
-        localStorage.setItem('numeroMesaFixoDoQrCode', numeroMesaQrCode);
     }
 });
 
@@ -859,8 +855,95 @@ window.fecharModalSacola = function() {
 
 const btnAbrirSacolaTopo = document.getElementById('btnAbrirSacolaTopo');
 if (btnAbrirSacolaTopo) {
-  btnAbrirSacolaTopo.addEventListener('click', window.abrirModalSacola);
+  btnAbrirSacolaTopo.addEventListener('click', () => {
+    const mesaDetectada = localStorage.getItem('mesaAtivaQrCode') || localStorage.getItem('numeroMesaFixoDoQrCode');
+    if (mesaDetectada) {
+      window.irParaOCarrinho();
+    } else {
+      window.abrirModalSacola();
+    }
+  });
 }
+
+// MODIFIQUE A FUNÇÃO DE IR PARA O CARRINHO SE FOR MESA DO QR CODE
+window.irParaOCarrinho = async function() {
+    const totalItensQtd = (sacola && sacola.length > 0) ? sacola.length : (carrinhoOla ? carrinhoOla.length : 0);
+    if (totalItensQtd === 0) {
+        alert("Sua sacola está vazia!");
+        return;
+    }
+
+    const mesaDetectada = localStorage.getItem('mesaAtivaQrCode') || localStorage.getItem('numeroMesaFixoDoQrCode');
+
+    if (mesaDetectada) {
+        // 🚨 ENGENHARIA SEM GARÇOM: Pula a tela de carrinho e joga direto na cozinha do Firebase!
+        if (confirm(`Deseja enviar seu pedido da Mesa ${mesaDetectada} direto para a cozinha?`)) {
+            try {
+                // Junta os nomes dos itens para salvar
+                const listaItensNomes = (sacola && sacola.length > 0)
+                    ? sacola.map(item => `${item.quantidade}x ${item.nome}`)
+                    : carrinhoOla.map(item => item.nome);
+
+                const valorTotalPedido = (sacola && sacola.length > 0)
+                    ? sacola.reduce((sum, item) => sum + (item.preco * item.quantidade), 0)
+                    : carrinhoOla.reduce((sum, item) => sum + item.preco, 0);
+
+                let numeroSeq = parseInt(localStorage.getItem('contadorPedidosTurno')) || 0;
+                numeroSeq += 1;
+                localStorage.setItem('contadorPedidosTurno', numeroSeq);
+
+                const identificadorMesa = `Mesa ${String(mesaDetectada).padStart(2, '0')}`;
+                const novoPedido = {
+                    cliente: identificadorMesa,
+                    clienteNome: identificadorMesa,
+                    tipo: 'mesa',
+                    mesa: parseInt(mesaDetectada) || mesaDetectada,
+                    numeroMesa: parseInt(mesaDetectada) || mesaDetectada,
+                    numeroSequencial: String(numeroSeq).padStart(2, '0'),
+                    itens: listaItensNomes,
+                    total: parseFloat(valorTotalPedido),
+                    subtotal: parseFloat(valorTotalPedido),
+                    status: 'pendente', // Aciona a impressora e acende o painel!
+                    endereco: `Consumo no Salão - Mesa ${mesaDetectada}`,
+                    data: new Date(),
+                    criadoEm: new Date().toISOString()
+                };
+
+                if (db) {
+                    await addDoc(collection(db, "pedidos"), novoPedido);
+                }
+
+                // Backup local para sincronização em tempo real
+                const pedidosLocais = JSON.parse(localStorage.getItem('pedidos_dom_gabriel') || '[]');
+                pedidosLocais.push({ id: `ped-${Date.now()}`, ...novoPedido });
+                localStorage.setItem('pedidos_dom_gabriel', JSON.stringify(pedidosLocais));
+
+                alert("Pedido enviado! Seu hambúrguer já começou a ser preparado. 🍔🔥");
+                sacola = [];
+                carrinhoOla = [];
+                localStorage.removeItem('meuCarrinho');
+                localStorage.removeItem('dom_gabriel_sacola');
+                localStorage.removeItem('carrinho_dom_gabriel');
+
+                const badgeQtd = document.getElementById('badgeQtd');
+                const precoSacola = document.getElementById('precoSacola');
+                const badgeTopo = document.getElementById('contagemSacolaTopo');
+                if (badgeQtd) badgeQtd.innerText = '0';
+                if (precoSacola) precoSacola.innerText = 'R$ 0,00';
+                if (badgeTopo) badgeTopo.innerText = '0';
+                atualizarSacolaUI();
+                renderizarProdutos();
+                fecharModalSacola();
+            } catch (erro) {
+                console.error("Erro ao enviar pedido para a cozinha:", erro);
+                alert("Erro ao enviar pedido para a cozinha.");
+            }
+        }
+    } else {
+        // Se não leu QR Code, segue o fluxo normal abrindo a tela de carrinho para preencher dados
+        window.location.href = "carrinho.html";
+    }
+};
 
 // FINALIZAR PEDIDO (SALVAR NO FIREBASE 'pedidos' -> DISPARA IMPRESSÃO NA COZINHA)
 window.finalizarPedido = async function(event) {
@@ -877,8 +960,12 @@ window.finalizarPedido = async function(event) {
   const formaPagamento = document.getElementById('selectPagamento')?.value || 'pix';
   const observacoes = document.getElementById('inputObsPedido')?.value || '';
 
+  let numeroDoPedidoAtual = parseInt(localStorage.getItem('contadorPedidosTurno')) || 0;
+  numeroDoPedidoAtual += 1;
+  localStorage.setItem('contadorPedidosTurno', numeroDoPedidoAtual);
+
+  const modoPedido = (modoAtual === 'mesa') ? 'mesa' : 'delivery/viagem';
   const mesaSalva = localStorage.getItem('numeroMesaFixoDoQrCode') || '01';
-  const ehMesa = (modoAtual === 'mesa');
 
   const totalValor = sacola.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
   const itensFormatados = sacola.map(s => `${s.quantidade}x ${s.nome}`);
@@ -887,27 +974,20 @@ window.finalizarPedido = async function(event) {
     cliente: nome,
     clienteNome: nome,
     telefone: telefone,
-    tipo: ehMesa ? 'mesa' : 'delivery',
-    mesa: ehMesa ? mesaSalva : null,
-    numeroMesa: ehMesa ? mesaSalva : null,
-    endereco: ehMesa ? `Consumo no Salão - Mesa ${mesaSalva}` : endereco,
+    tipo: modoPedido, // 'delivery/viagem' ou 'mesa'
+    numeroSequencial: String(numeroDoPedidoAtual).padStart(2, '0'), // Gera #01, #02...
+    mesa: modoPedido === 'mesa' ? (localStorage.getItem('numeroMesaFixoDoQrCode') || mesaSalva) : null,
+    numeroMesa: modoPedido === 'mesa' ? (localStorage.getItem('numeroMesaFixoDoQrCode') || mesaSalva) : null,
+    endereco: modoPedido === 'mesa' ? `Consumo no Salão - Mesa ${mesaSalva}` : endereco,
     itens: itensFormatados,
     total: totalValor,
     subtotal: totalValor,
     formaPagamento: formaPagamento,
     observacoes: observacoes,
     status: 'pendente', // Status 'pendente' dispara a impressora automaticamente no painel logístico!
+    data: new Date(),
     criadoEm: new Date().toISOString()
   };
-
-  const mesaDoQrCode = localStorage.getItem('numeroMesaFixoDoQrCode');
-  if (mesaDoQrCode) {
-      // Injeta o número capturado no objeto que vai para a cozinha!
-      pedido.mesa = mesaDoQrCode;
-      pedido.numeroMesa = mesaDoQrCode;
-      pedido.tipo = 'mesa';
-      pedido.endereco = `Consumo no Salão - Mesa ${mesaDoQrCode}`;
-  }
 
   const btnConfirmar = document.getElementById('btnConfirmarPedido');
   if (btnConfirmar) {

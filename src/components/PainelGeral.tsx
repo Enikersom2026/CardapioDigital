@@ -22,6 +22,7 @@ import {
   Search,
   Check,
   Utensils,
+  UtensilsCrossed,
   ArrowRight,
   ShieldCheck,
   Radio,
@@ -647,14 +648,11 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
       {/* 1. TOPO DO PAINEL GERAL (Sem menu lateral - Navegação limpa no topo) */}
       <header className="bg-[#1a1a1e] px-4 sm:px-8 py-3.5 border-b border-[#29292e] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-orange-950/60 border border-orange-800/40 flex items-center justify-center text-xl shadow-[0_0_12px_rgba(255,75,43,0.3)] shrink-0">
-            🔥
-          </div>
           <div>
             <h1 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
               <span>Painel Geral</span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#00b37e]/15 text-[#00b37e] border border-[#00b37e]/30">
-                Online
+                Ativo
               </span>
             </h1>
             <p className="text-xs text-[#8d8d99]">{restaurant.name} • Gestão Administrativa</p>
@@ -671,8 +669,7 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
                 : 'text-[#8d8d99] hover:text-white hover:bg-[#28282e]'
             }`}
           >
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>📊 Visão Geral</span>
+            <span>Visão Geral</span>
           </button>
 
           <button
@@ -683,8 +680,7 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
                 : 'text-[#8d8d99] hover:text-white hover:bg-[#28282e]'
             }`}
           >
-            <ShoppingBag className="w-3.5 h-3.5 text-green-400" />
-            <span>🍔 Vendas & Histórico</span>
+            <span>Vendas & Histórico</span>
           </button>
 
           <button
@@ -695,8 +691,7 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
                 : 'text-[#8d8d99] hover:text-white hover:bg-[#28282e]'
             }`}
           >
-            <DollarSign className="w-3.5 h-3.5 text-yellow-400" />
-            <span>💰 Financeiro & Métricas</span>
+            <span>Financeiro & Métricas</span>
           </button>
 
           <button
@@ -707,8 +702,7 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
                 : 'text-[#8d8d99] hover:text-white hover:bg-[#28282e]'
             }`}
           >
-            <Package className="w-3.5 h-3.5 text-amber-400" />
-            <span>📦 Estoque de Insumos</span>
+            <span>Estoque de Insumos</span>
           </button>
         </div>
       </header>
@@ -727,7 +721,7 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
               <div className="p-5 rounded-2xl bg-gradient-to-r from-[#1a1a1e] via-[#202024] to-[#1a1a1e] border border-[#29292e] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <span className="text-[#ff4b2b]">🔥 Central Dom Gabriel</span>
+                    <span className="text-[#ff4b2b]">Central Dom Gabriel</span>
                   </h2>
                   <p className="text-xs sm:text-sm text-[#8d8d99] mt-1">
                     Todos os módulos abertos diretamente dentro do aplicativo, sem links externos ou páginas separadas.
@@ -817,12 +811,12 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
                     className="p-5 rounded-xl bg-[#1a1a1e] border border-[#29292e] hover:border-sky-500 transition-all cursor-pointer group hover:-translate-y-0.5"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-sky-950/60 border border-sky-800/40 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
-                        🍽️
+                      <div className="w-12 h-12 rounded-xl bg-sky-950/60 border border-sky-800/40 flex items-center justify-center text-sky-400 group-hover:scale-105 transition-transform">
+                        <UtensilsCrossed className="w-6 h-6" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-white group-hover:text-sky-400 transition-colors">Controle de Mesas</h4>
-                        <p className="text-xs text-[#8d8d99] mt-0.5">Comandas, salão físico e consumo por mesa</p>
+                        <h4 className="font-bold text-white group-hover:text-sky-400 transition-colors">Controle de Mesa</h4>
+                        <p className="text-xs text-[#8d8d99] mt-0.5">Comandas, controle de mesa e consumo por mesa</p>
                       </div>
                     </div>
                   </div>
@@ -910,7 +904,7 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[#29292e] gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-[#ff4b2b] flex items-center gap-2">
-                    <span>🛵 Monitor de Delivery & Despacho</span>
+                    <span>Monitor de Delivery & Despacho</span>
                   </h2>
                   <p className="text-xs text-[#8d8d99] mt-0.5">
                     Acompanhe cada etapa dos pedidos em tempo real via Firestore
@@ -1224,7 +1218,7 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[#29292e] gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-[#ff4b2b] flex items-center gap-2">
-                    <span>🍽️ Controle de Mesas & Salão Físico</span>
+                    <span>Controle de Mesa</span>
                   </h2>
                   <p className="text-xs text-[#8d8d99] mt-0.5">
                     Gerencie comandas, consumo de lanches e fechamento de conta por mesa

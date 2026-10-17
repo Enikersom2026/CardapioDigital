@@ -6,6 +6,10 @@
   <title>Painel de Logística & Cozinha - Dom Gabriel Hamburgueria</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.02); }
+    }
     @keyframes pulse-fast {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.85; transform: scale(1.02); }
@@ -13,6 +17,64 @@
     .pulse-glow {
       box-shadow: 0 0 25px rgba(255, 75, 43, 0.4);
     }
+    .card-delivery {
+      background: #181922;
+      border: 1px solid #282a36;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .card-delivery:hover {
+      border-color: rgba(255, 75, 43, 0.4);
+    }
+    .id-pedido {
+      font-family: monospace;
+      font-weight: 800;
+      font-size: 14px;
+      color: #00b37e;
+    }
+    .status-tag {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-pendente { background: rgba(255,184,108,0.2); color: #ffb86c; border: 1px solid rgba(255,184,108,0.4); }
+    .status-preparando { background: rgba(139,233,253,0.2); color: #8be9fd; border: 1px solid rgba(139,233,253,0.4); }
+    .status-pronto_entrega, .status-pronto { background: rgba(80,250,123,0.2); color: #50fa7b; border: 1px solid rgba(80,250,123,0.4); }
+    .status-saiu_para_entrega, .status-saiu_entrega { background: rgba(255,159,28,0.2); color: #ff9f1c; border: 1px solid rgba(255,159,28,0.4); }
+    .status-entregue { background: rgba(0,179,126,0.2); color: #00b37e; border: 1px solid rgba(0,179,126,0.4); }
+    .btn-logistica {
+      width: 100%;
+      border: none;
+      padding: 11px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: 0.2s;
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-preparar {
+      background: #007bff;
+      color: white;
+    }
+    .btn-preparar:hover { background: #0069d9; }
+    .btn-despachar {
+      background: #28a745;
+      color: white;
+    }
+    .btn-despachar:hover { background: #218838; }
   </style>
 </head>
 <body class="bg-[#0f1016] text-white min-h-screen font-sans selection:bg-[#ff4b2b] selection:text-white">
@@ -33,9 +95,6 @@
 
       <!-- Action Buttons Hardware -->
       <div class="flex flex-wrap items-center gap-2">
-        <a href="admin_painel_geral.html" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold rounded-xl border border-zinc-700 flex items-center gap-1.5 transition-all text-zinc-300">
-          📊 Centro de Comando
-        </a>
         <a href="admin_configuracoes.html" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold rounded-xl border border-zinc-700 flex items-center gap-1.5 transition-all text-zinc-300">
           ⚙️ Configurações
         </a>
@@ -106,7 +165,7 @@
         <span id="contadorPedidos" class="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-300">0 pedidos</span>
       </div>
 
-      <div id="listaPedidos" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+      <div id="containerDelivery" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
         <div class="col-span-full py-12 text-center text-zinc-500 text-xs">
           Conectando ao Firebase Firestore e escutando pedidos pendentes...
         </div>
@@ -298,51 +357,92 @@
 
     let primeiraCarga = true;
 
-    // Escuta a entrada de novos pedidos e dispara o papel sem clique manual
+    // Função para mudar o status do pedido na logística
+    window.mudarStatusLogistica = async function(id, novoStatus) {
+        try {
+            await updateDoc(doc(db, "pedidos", id), { status: novoStatus });
+        } catch (erro) {
+            console.error("Erro ao mudar status do pedido:", erro);
+        }
+    };
+
+    // MONITOR DE LOGÍSTICA COM ALERTAS AUTOMÁTICOS DO ENTREGADOR
     onSnapshot(collection(db, "pedidos"), (snapshot) => {
-        const pedidosMap = [];
-        snapshot.forEach((d) => {
-            pedidosMap.push({ id: d.id, ...d.data() });
+        const container = document.getElementById('containerDelivery') || document.getElementById('listaPedidos');
+        container.innerHTML = '';
+        
+        let temDelivery = false;
+        let totalAtivos = 0;
+
+        snapshot.forEach((docSnap) => {
+            const pedido = docSnap.data();
+            const id = docSnap.id;
+
+            // Filtra apenas o que for delivery (e não arquivado)
+            if (pedido.tipo === 'delivery' && pedido.status !== 'arquivado') {
+                temDelivery = true;
+                totalAtivos++;
+                
+                let classeStatus = `status-${pedido.status}`;
+                let acaoBotaoHTML = '';
+                let bordaDestaqueEstilo = '';
+                let badgeAlertaEntregador = '';
+
+                // 🚨 ENGENHARIA DE ALERTAS EM TEMPO REAL:
+                if (pedido.status === 'pendente') {
+                    acaoBotaoHTML = `<button class="btn-logistica btn-preparar" onclick="mudarStatusLogistica('${id}', 'preparando')">👨‍🍳 Aceitar e Preparar</button>`;
+                } else if (pedido.status === 'preparando') {
+                    acaoBotaoHTML = `<button class="btn-logistica btn-despachar" onclick="mudarStatusLogistica('${id}', 'pronto_entrega')">📦 Enviar p/ Entregador</button>`;
+                } else if (pedido.status === 'pronto_entrega') {
+                    acaoBotaoHTML = `<p style="text-align:center; color:#8d8d99; font-size:12px; margin-top:15px;">Aguardando motoboy coletar na bancada... ⏳</p>`;
+                } 
+                // 🛵 QUANDO O ENTREGADOR ATIVA O GPS NO CELULAR:
+                else if (pedido.status === 'saiu_para_entrega') {
+                    bordaDestaqueEstilo = 'border: 2px solid #ff9f1c; background: #1e1b15;'; // Card fica laranja escuro
+                    badgeAlertaEntregador = `<div style="background: #ff9f1c; color: #111; font-size: 11px; font-weight: bold; padding: 4px; border-radius: 6px; text-align: center; margin-bottom: 10px; animation: pulse 1.5s infinite;">⚡ Iniciando Entrega</div>`;
+                    acaoBotaoHTML = `<p style="text-align:center; color:#ff9f1c; font-size:12px; margin-top:5px;">Rastreando Motoboy via GPS... 📍</p>`;
+                } 
+                // 🏁 QUANDO O ENTREGADOR CONCLUI A CORRIDA NO CELULAR:
+                else if (pedido.status === 'entregue') {
+                    bordaDestaqueEstilo = 'border: 2px solid #00b37e; opacity: 0.8;'; // Card fica verde
+                    badgeAlertaEntregador = `<div style="background: #00b37e; color: white; font-size: 11px; font-weight: bold; padding: 4px; border-radius: 6px; text-align: center; margin-bottom: 10px;">✅ Entrega Finalizada</div>`;
+                    acaoBotaoHTML = `<button class="btn-logistica" style="background:#29292e; color:#aaa;" onclick="arquivarPedidoPedido('${id}')">Arquivar Pedido</button>`;
+                }
+
+                const itensHTML = Array.isArray(pedido.itens)
+                    ? pedido.itens.map(it => typeof it === 'string' ? it : (it.quantidade ? `${it.quantidade}x ` : '') + (it.nome || it.name || 'Item')).join('<br>')
+                    : (pedido.itens || 'Hambúrguer Selecionado');
+
+                container.innerHTML += `
+                    <div class="card-delivery" style="${bordaDestaqueEstilo}">
+                        ${badgeAlertaEntregador}
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                            <span class="id-pedido">#${pedido.numeroSequencial || id.substring(0,5).toUpperCase()}</span>
+                            <span class="status-tag ${classeStatus}">${(pedido.status || 'pendente').toUpperCase()}</span>
+                        </div>
+                        <p style="font-size:15px; font-weight:600; margin-bottom:5px;">Pedido Viagem / Entrega</p>
+                        <p style="font-size:13px; color:#aaa; margin-bottom:8px;">📍 ${pedido.endereco || 'Retirada no Balcão'}</p>
+                        
+                        <div style="background:#20212c; padding:8px; border-radius:6px; font-size:13px; color:#e1e1e6; margin-bottom:10px;">
+                            ${itensHTML}
+                        </div>
+                        ${acaoBotaoHTML}
+                    </div>
+                `;
+            }
         });
 
-        // Atualiza a listagem na interface
-        document.getElementById('contadorPedidos').textContent = `${pedidosMap.length} pedidos`;
-        const container = document.getElementById('listaPedidos');
-        if (pedidosMap.length === 0) {
-            container.innerHTML = `<div class="col-span-full py-8 text-center text-zinc-500 text-xs">Nenhum pedido encontrado no Firebase.</div>`;
-        } else {
-            container.innerHTML = pedidosMap.map(p => `
-                <div class="p-3.5 bg-[#12131a] border border-[#282a36] rounded-xl flex flex-col justify-between gap-3">
-                  <div class="flex items-start justify-between gap-2">
-                    <div>
-                      <span class="text-xs font-mono font-bold text-amber-400">#${(p.numeroPedido || p.id).slice(-4)}</span>
-                      <h3 class="text-sm font-bold text-white">${p.clienteNome || p.cliente || 'Cliente'}</h3>
-                      <p class="text-[11px] text-zinc-400">${p.endereco || (p.tipo === 'mesa' ? 'Mesa ' + (p.mesa || '01') : 'Balcão')}</p>
-                    </div>
-                    <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                      p.status === 'pendente' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                      p.status === 'preparando' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' :
-                      'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    }">${p.status || 'pendente'}</span>
-                  </div>
-                  <div class="flex items-center justify-between pt-2 border-t border-[#222432]">
-                    <span class="text-xs font-mono font-bold text-emerald-400">R$ ${(Number(p.total) || 0).toFixed(2).replace('.', ',')}</span>
-                    <button type="button" onclick='window.imprimirComandaCozinha(${JSON.stringify(p)})' class="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold rounded-lg border border-zinc-700 flex items-center gap-1 cursor-pointer">
-                      🖨️ Imprimir
-                    </button>
-                  </div>
-                </div>
-            `).join('');
-        }
+        const contadorEl = document.getElementById('contadorPedidos');
+        if (contadorEl) contadorEl.textContent = `${totalAtivos} pedidos`;
 
-        // Detecta novas inclusões em tempo real
+        if(!temDelivery) container.innerHTML = '<p style="color:#8d8d99; font-size:14px; text-align:center; width:100%; grid-column: 1 / -1; padding: 30px 0;">Nenhum delivery ativo na fila.</p>';
+
+        // Dispara impressão automática na chapa para novos pedidos
         snapshot.docChanges().forEach((change) => {
-            // Identifica apenas novos documentos inseridos na coleção de pedidos
             if (change.type === "added") {
                 const novoPedido = change.doc.data();
                 novoPedido.id = change.doc.id;
 
-                // Se o status for pendente (lançado na mesa pelo garçom ou pelo cliente em casa), imprime automaticamente!
                 if (!primeiraCarga && (novoPedido.status === "pendente" || novoPedido.status === "novo")) {
                     window.imprimirComandaCozinha(novoPedido);
                 }
@@ -350,6 +450,13 @@
         });
         primeiraCarga = false;
     });
+
+    // Função para arquivar o pedido entregue e tirar da tela de despacho
+    window.arquivarPedidoPedido = async function(id) {
+        if(confirm("Deseja arquivar este pedido finalizado?")) {
+            await updateDoc(doc(db, "pedidos", id), { status: 'arquivado' });
+        }
+    };
   </script>
 </body>
 </html>

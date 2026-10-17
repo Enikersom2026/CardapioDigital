@@ -119,9 +119,9 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label for="nomeClienteMesa">Nome do Cliente na Mesa:</label>
-                <input type="text" id="nomeClienteMesa" placeholder="Ex: Roberto Alencar">
+            <div class="form-group" style="padding: 10px 14px; background: #202024; border-radius: 8px; border: 1px solid #29292e; color: #ffb86c; font-weight: bold; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+                <span>🪑 Identificação:</span>
+                <span id="identificadorMesaModal" style="color: #fff;">Mesa</span>
             </div>
 
             <div class="form-group">
@@ -129,6 +129,16 @@
                 <select id="selectProdutoMesa">
                     <!-- Carregado do Estoque automaticamente -->
                 </select>
+            </div>
+
+            <div class="form-group" style="margin-top: 12px;">
+                <label style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Turbinar com Adicionais Extras:</span>
+                    <span id="txtAdicionaisSomaHtml" style="color:#00b37e; font-size:11px; font-weight:bold; font-family:monospace;">+ R$ 0,00</span>
+                </label>
+                <div id="containerAdicionaisHtml" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; max-height:100px; overflow-y:auto; padding:4px; background:#141418; border-radius:8px; border:1px solid #29292e;">
+                    <!-- Renderizado dinamicamente via JS -->
+                </div>
             </div>
 
             <button class="btn-modal btn-lancar" onclick="dispararPedidoParaCozinha()">🔥 Lançar e Imprimir na Cozinha</button>
@@ -232,9 +242,12 @@
         const infoOcupada = document.getElementById('infoMesaOcupada');
         const btnLiberar = document.getElementById('btnLiberarMesa');
 
+        const identificadorTexto = `Mesa ${String(numeroMesa).padStart(2, '0')}`;
+        const spanIdentificador = document.getElementById('identificadorMesaModal');
+        if (spanIdentificador) spanIdentificador.innerText = identificadorTexto;
+
         if (pedidoExistente) {
             documentoMesaIdAtual = pedidoExistente.id;
-            document.getElementById('nomeClienteMesa').value = pedidoExistente.cliente || pedidoExistente.clienteNome || '';
             const itensLista = Array.isArray(pedidoExistente.itens) ? pedidoExistente.itens : [];
             const itensTexto = itensLista.map(it => {
                 if (typeof it === 'string') return `• ${it}`;
@@ -248,10 +261,15 @@
             btnLiberar.style.display = "block";
         } else {
             documentoMesaIdAtual = null;
-            document.getElementById('nomeClienteMesa').value = '';
             infoOcupada.style.display = "none";
             btnLiberar.style.display = "none";
         }
+
+        // Reseta e renderiza adicionais extras no modal
+        adicionaisMesaSelecionadosHtml = [];
+        const txtSomaAdics = document.getElementById('txtAdicionaisSomaHtml');
+        if (txtSomaAdics) txtSomaAdics.innerText = '+ R$ 0,00';
+        window.renderizarAdicionaisHtml();
 
         document.getElementById('modalLigarMesa').style.display = 'flex';
     };
@@ -263,6 +281,52 @@
     window.abrirCardapioMesa = function() {
         if (!mesaSelecionadaNum) return;
         window.open(`/cardapio.html?mesa=${mesaSelecionadaNum}`, '_blank');
+    };
+
+    // Gerenciador de Adicionais Extras do Modal
+    let adicionaisMesaSelecionadosHtml = [];
+    const listaAdicionaisPadraoHtml = [
+        { nome: "Bacon Crocante Fatiado", preco: 5.00 },
+        { nome: "Queijo Cheddar Extra", preco: 4.50 },
+        { nome: "Hambúrguer Extra 160g", preco: 12.00 },
+        { nome: "Cebola Caramelizada", preco: 4.00 },
+        { nome: "Maionese Verde da Casa", preco: 3.00 },
+        { nome: "Catupiry Original", preco: 5.50 },
+        { nome: "Smash Extra 80g", preco: 9.00 },
+        { nome: "Cebola Crispy Crocante", preco: 4.50 }
+    ];
+
+    window.renderizarAdicionaisHtml = function() {
+        const container = document.getElementById('containerAdicionaisHtml');
+        if (!container) return;
+        container.innerHTML = '';
+        listaAdicionaisPadraoHtml.forEach(a => {
+            const isSel = adicionaisMesaSelecionadosHtml.some(sel => sel.nome === a.nome);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.style.padding = '5px 9px';
+            btn.style.borderRadius = '6px';
+            btn.style.fontSize = '11px';
+            btn.style.fontWeight = 'bold';
+            btn.style.cursor = 'pointer';
+            btn.style.border = isSel ? '1px solid #00b37e' : '1px solid #3e3e46';
+            btn.style.background = isSel ? '#00b37e' : '#202024';
+            btn.style.color = isSel ? '#000' : '#c4c4cc';
+            btn.style.transition = '0.15s';
+            btn.innerText = `+ ${a.nome} (+ R$ ${a.preco.toFixed(2).replace('.', ',')})`;
+            btn.onclick = () => {
+                if (isSel) {
+                    adicionaisMesaSelecionadosHtml = adicionaisMesaSelecionadosHtml.filter(sel => sel.nome !== a.nome);
+                } else {
+                    adicionaisMesaSelecionadosHtml.push(a);
+                }
+                const soma = adicionaisMesaSelecionadosHtml.reduce((s, curr) => s + curr.preco, 0);
+                const txtSoma = document.getElementById('txtAdicionaisSomaHtml');
+                if (txtSoma) txtSoma.innerText = `+ R$ ${soma.toFixed(2).replace('.', ',')}`;
+                window.renderizarAdicionaisHtml();
+            };
+            container.appendChild(btn);
+        });
     };
 
     // Cardápio padrão imediato
@@ -311,7 +375,8 @@
     });
 </script>
 
-<!-- INTEGRAÇÃO OPCIONAL COM O FIREBASE EM SEGUNDO PLANO -->
+<!-- INTEGRAÇÃO OPCIONAL COM O FIREBASE EM SEGUNDO PLANO E IMPRESSÃO DA CHAPA -->
+<script src="impressao_cozinha.js"></script>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -336,6 +401,7 @@
 
     if (db) {
         try {
+            let primeiraCargaMesas = true;
             onSnapshot(collection(db, "pedidos"), (snapshot) => {
                 pedidosNoSalao = {};
                 snapshot.forEach(docSnap => {
@@ -345,6 +411,23 @@
                     }
                 });
                 window.renderizarGridDeMesas();
+
+                // GATILHO EM TEMPO REAL: ESCUTA, ABRE A COMANDA E IMPRIME SOZINHO
+                snapshot.docChanges().forEach((change) => {
+                    // Monitora apenas novos pedidos criados na plataforma
+                    if (change.type === "added") {
+                        const pedidoNovo = change.doc.data();
+                        pedidoNovo.id = change.doc.id;
+
+                        // Se for um pedido novo que entrou como pendente (via QR Code ou Caixa)
+                        if (!primeiraCargaMesas && pedidoNovo.status === "pendente") {
+                            if (typeof window.imprimirComandaCozinha === 'function') {
+                                window.imprimirComandaCozinha(pedidoNovo);
+                            }
+                        }
+                    }
+                });
+                primeiraCargaMesas = false;
             });
 
             onSnapshot(collection(db, "pratos"), (snapshot) => {
@@ -362,74 +445,69 @@
         }
     }
 
-    // Lançamento de Pedido
+    const fecharModalMesa = () => (window.fecharModalMesa ? window.fecharModalMesa() : null);
+
+    // 🚨 CORREÇÃO DA ZOE: LANÇA NOVOS ITENS NA MESA SEM APAGAR OS ANTERIORES
     window.dispararPedidoParaCozinha = async function() {
-        const nomeCliente = document.getElementById('nomeClienteMesa').value || `Mesa ${mesaSelecionadaNum}`;
+        const nomeCliente = `Mesa ${String(mesaSelecionadaNum).padStart(2, '0')}`;
         const prodSelecionado = document.getElementById('selectProdutoMesa').value;
         
-        if(!prodSelecionado) { alert("Nenhum hambúrguer cadastrado no sistema!"); return; }
+        if(!prodSelecionado) { 
+            alert("Nenhum hambúrguer selecionado no sistema!"); 
+            return; 
+        }
         
         const [nomeItem, precoItemStr] = prodSelecionado.split('|');
         const precoItem = parseFloat(precoItemStr) || 0;
+        const somaAdicionais = adicionaisMesaSelecionadosHtml.reduce((acc, a) => acc + (parseFloat(a.preco) || 0), 0);
+        const precoFinalItem = precoItem + somaAdicionais; // 🚨 SOMA O VALOR DO ADICIONAL!
+
+        const adicsTexto = adicionaisMesaSelecionadosHtml.map(a => `+ ${a.nome} (R$ ${a.preco.toFixed(2).replace('.', ',')})`);
+        const itemFormatado = adicsTexto.length > 0 ? `1x ${nomeItem} [${adicsTexto.join(', ')}]` : `1x ${nomeItem}`;
 
         try {
-            if (documentoMesaIdAtual && db) {
-                const pedAtual = pedidosNoSalao[mesaSelecionadaNum];
-                const itensAntigos = Array.isArray(pedAtual?.itens) ? pedAtual.itens : [];
-                const itensAtualizados = [...itensAntigos, `1x ${nomeItem}`];
-                const novoTotal = (Number(pedAtual?.total) || 0) + precoItem;
+            if (documentoMesaIdAtual) {
+                // --- CÊNARIO A: A MESA JÁ ESTÁ OCUPADA ---
+                // Buscamos os dados atuais que estão salvos na memória local do app para fazer a soma financeira correta
+                const pedidoAntigo = pedidosNoSalao[mesaSelecionadaNum];
+                const novoPrecoAcumulado = parseFloat(pedidoAntigo.total || 0) + parseFloat(precoFinalItem);
+                
+                // Criamos a lista atualizada juntando o histórico antigo com o novo lanche lançado
+                let itensAtualizados = [];
+                if (pedidoAntigo.itens && Array.isArray(pedidoAntigo.itens)) {
+                    itensAtualizados = [...pedidoAntigo.itens, itemFormatado];
+                } else {
+                    itensAtualizados = [itemFormatado];
+                }
 
                 const pedidoRef = doc(db, "pedidos", documentoMesaIdAtual);
                 await updateDoc(pedidoRef, {
-                    itens: itensAtualizados,
-                    total: novoTotal,
-                    status: 'pendente'
+                    itens: itensAtualizados, // 🚨 Injeta a lista completa unificada com adicionais
+                    total: parseFloat(novoPrecoAcumulado), // Atualiza o financeiro acumulado da mesa com adicionais somados
+                    status: 'pendente', // Volta para pendente para a impressora da cozinha cuspir o papel extra!
+                    dataAtualizacao: new Date()
                 });
-            } else if (db) {
-                const novoObj = {
-                    cliente: nomeCliente,
-                    clienteNome: nomeCliente,
-                    tipo: 'mesa',
-                    mesa: mesaSelecionadaNum,
-                    numeroMesa: mesaSelecionadaNum,
-                    itens: [`1x ${nomeItem}`],
-                    total: precoItem,
-                    subtotal: precoItem,
-                    status: 'pendente',
-                    criadoEm: new Date().toISOString()
-                };
-                const novoPedidoRef = doc(collection(db, "pedidos"));
-                await setDoc(novoPedidoRef, novoObj);
+
             } else {
-                pedidosNoSalao[mesaSelecionadaNum] = {
-                    id: `mesa-${Date.now()}`,
+                // --- CENÁRIO B: A MESA ESTAVA LIVRE (PRIMEIRO LANÇAMENTO) ---
+                const novoPedidoRef = doc(collection(db, "pedidos"));
+                await setDoc(novoPedidoRef, {
                     cliente: nomeCliente,
                     tipo: 'mesa',
                     mesa: mesaSelecionadaNum,
-                    itens: [`1x ${nomeItem}`],
-                    total: precoItem,
-                    status: 'pendente'
-                };
-                window.renderizarGridDeMesas();
-            }
-
-            // Dispara formatação e impressão ultra rápida para a chapa
-            if (typeof window.imprimirComandaCozinha === 'function') {
-                window.imprimirComandaCozinha({
-                    id: documentoMesaIdAtual || `M-${mesaSelecionadaNum}`,
-                    tipo: 'mesa',
-                    mesa: mesaSelecionadaNum,
-                    cliente: nomeCliente,
-                    itens: [`1x ${nomeItem}`],
-                    observacao: ''
+                    itens: [itemFormatado], // Inicia a lista com o lanche e adicionais
+                    total: parseFloat(precoFinalItem), // Inicia o financeiro da mesa somando os adicionais
+                    status: 'pendente', // Ativa o gatilho da impressora térmica
+                    data: new Date()
                 });
             }
 
-            window.exibirNotificacaoToast(`Item lançado e enviado para a chapa da Mesa ${mesaSelecionadaNum}!`);
-            window.fecharModalMesa();
+            alert("Lançado com sucesso! O novo item foi somado à comanda e enviado para a chapa. 🍔🖨️");
+            fecharModalMesa();
+
         } catch (erro) {
-            console.error("Erro ao disparar pedido:", erro);
-            alert("Erro ao salvar pedido na mesa: " + (erro.message || ''));
+            console.error("Erro ao lançar pedido na mesa:", erro);
+            alert("Ops! Ocorreu um erro ao salvar o novo item no banco de dados.");
         }
     };
 

@@ -20,6 +20,9 @@ import {
   Check,
   Printer,
   FileText,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { db, doc, updateDoc, onSnapshot, collection, setDoc } from '../services/firebase';
 import { DeliveryOrder, RestaurantConfig } from '../types';
@@ -33,8 +36,12 @@ import {
   isBluetoothSupported,
 } from '../utils/thermalPrinter';
 
+export type LogisticaSubTab = 'despacho' | 'motoboy' | 'historico' | 'hardware';
+
 interface DeliveryPanelProps {
   restaurant: RestaurantConfig;
+  subTab?: LogisticaSubTab;
+  onSubTabChange?: (sub: LogisticaSubTab) => void;
   onVoltarCardapio?: () => void;
   onVoltarPainel?: () => void;
 }
@@ -92,11 +99,42 @@ const PEDIDOS_DEMO_INICIAIS: DeliveryOrder[] = [
 
 export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
   restaurant,
+  subTab,
+  onSubTabChange,
   onVoltarCardapio,
   onVoltarPainel,
 }) => {
-  // Alternância de visão: Monitor de Delivery/Logística vs App do Entregador (GPS)
-  const [modoPainel, setModoPainel] = useState<'logistica' | 'motoboy'>('logistica');
+  // Submenu Lateral de Logística: 'despacho' | 'motoboy' | 'historico' | 'hardware'
+  const [activeSubTab, setActiveSubTab] = useState<LogisticaSubTab>(subTab || 'despacho');
+  // Estado para recolher/expandir o submenu lateral de logística
+  const [submenuRecolhido, setSubmenuRecolhido] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('domgabriel_logistica_submenu_recolhido') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleSubmenuRecolhido = () => {
+    setSubmenuRecolhido((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('domgabriel_logistica_submenu_recolhido', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (subTab) {
+      setActiveSubTab(subTab);
+    }
+  }, [subTab]);
+
+  const handleSubTabSelect = (tab: LogisticaSubTab) => {
+    setActiveSubTab(tab);
+    if (onSubTabChange) onSubTabChange(tab);
+  };
 
   const [pedidos, setPedidos] = useState<DeliveryOrder[]>(() => {
     try {
@@ -348,6 +386,19 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
     }
   };
 
+  // Função para arquivar o pedido entregue e tirar da tela de despacho
+  const arquivarPedido = async (id: string) => {
+    if (window.confirm('Deseja arquivar este pedido finalizado?')) {
+      try {
+        const pedidoRef = doc(db, 'pedidos', id);
+        await updateDoc(pedidoRef, { status: 'arquivado' });
+        setPedidos((prev) => prev.filter((p) => p.id !== id));
+      } catch (erro) {
+        console.error('Erro ao arquivar pedido:', erro);
+      }
+    }
+  };
+
   // Função principal de ativação e alternância de GPS (conforme o snippet do usuário)
   const alternarRastreamentoGPS = (pedidoId: string) => {
     // Se já estava rodando este mesmo pedido, desliga o GPS
@@ -514,9 +565,11 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
       .join(', ');
   };
 
-  // Pedidos para o Monitor de Delivery & Despacho (pendente, preparando, pronto)
-  const pedidosDeliveryMonitor = pedidos.filter((p) =>
-    ['pendente', 'preparando', 'em_preparo', 'pronto', 'pronto_entrega'].includes(p.status)
+  // Pedidos para o Monitor de Delivery & Despacho (conforme lógica inteligente do usuário)
+  const pedidosDeliveryMonitor = pedidos.filter(
+    (p) =>
+      p.status !== 'arquivado' &&
+      ['pendente', 'preparando', 'em_preparo', 'pronto', 'pronto_entrega', 'saiu_para_entrega', 'saiu_entrega', 'entregue'].includes(p.status)
   );
 
   // Filtragem dos pedidos para o entregador
@@ -537,91 +590,11 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
 
   const qtdEmEntrega = pedidos.filter((p) => p.status === 'saiu_para_entrega' || p.status === 'saiu_entrega').length;
   const qtdPendentes = pedidos.filter((p) => ['pendente', 'em_preparo', 'preparando', 'pronto', 'pronto_entrega'].includes(p.status)).length;
+  const pedidosEntregues = pedidos.filter((p) => p.status === 'entregue');
+  const faturamentoEntregas = pedidosEntregues.reduce((acc, p) => acc + (Number(p.total) || 0), 0);
 
   return (
-    <div className="min-h-screen bg-[#0f1016] text-white p-3.5 sm:p-6 font-sans max-w-6xl mx-auto text-left">
-      {/* SELETOR SUPERIOR DO MONITOR DE LOGÍSTICA & DESPACHO */}
-      <div className="mb-5 pb-4 border-b border-[#282a36] flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 p-1.5 bg-[#181922] border border-[#282a36] rounded-xl self-start">
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold bg-[#ff4b2b] text-white shadow-[0_0_15px_rgba(255,75,43,0.4)]">
-            <ChefHat className="w-4 h-4" />
-            <span>Monitor de Delivery & Despacho</span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-black/40 font-mono font-bold">
-              {pedidosDeliveryMonitor.length}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {onVoltarPainel && (
-            <button
-              type="button"
-              onClick={onVoltarPainel}
-              className="px-3.5 py-2 rounded-xl bg-[#181922] hover:bg-[#222432] border border-[#282a36] hover:border-[#ff4b2b] text-xs font-bold text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-              title="Voltar ao Painel Geral de Gestão"
-            >
-              <span>📊 Painel Geral</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              const novo = !autoPrintCozinha;
-              setAutoPrintCozinha(novo);
-              try {
-                localStorage.setItem('domgabriel_autoprint_cozinha', String(novo));
-              } catch {}
-            }}
-            className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-              autoPrintCozinha
-                ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/60 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
-                : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-400'
-            }`}
-            title="Dispara a impressora térmica USB automaticamente quando um novo pedido com status pendente entra no Firebase"
-          >
-            <span className={autoPrintCozinha ? 'animate-pulse' : ''}>⚡</span>
-            <span>Auto-Imprimir:</span>
-            <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
-                autoPrintCozinha ? 'bg-emerald-500 text-black' : 'bg-zinc-700 text-zinc-300'
-              }`}
-            >
-              {autoPrintCozinha ? 'LIGADO' : 'DESLIGADO'}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleConectarBluetooth}
-            className="px-3 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.2)]"
-            title="Conectar impressora térmica Bluetooth (Celular, Tablet ou sem fio)"
-          >
-            <span>📱 Bluetooth</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleTestarImpressora}
-            className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_10px_rgba(245,158,11,0.2)]"
-            title="Testar impressora térmica USB/Serial (ESC/POS)"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>🖨️ Testar Térmica USB</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleCriarPedidoTeste}
-            className="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.2)]"
-            title="Adicionar simulação de entrega para testar o fluxo"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ Simular Pedido</span>
-          </button>
-        </div>
-      </div>
-
+    <div className="min-h-screen bg-[#0f1016] text-white p-3.5 sm:p-6 font-sans max-w-7xl mx-auto text-left">
       {/* Alerta / Toast de Impressão Térmica */}
       {toastImpressao && (
         <div
@@ -636,16 +609,172 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* MODO 1: MONITOR DE DELIVERY & DESPACHO (EXATAMENTE O SNIPPET) */}
-      {/* ======================================================== */}
-      {modoPainel === 'logistica' && (
+      {/* ESTRUTURA PRINCIPAL COM SUBMENU LATERAL DE LOGÍSTICA */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* 🚨 SUBMENU LATERAL DE LOGÍSTICA (RECOLHÍVEL) */}
+        <aside
+          className={`shrink-0 bg-[#14151e] border border-[#232532] rounded-2xl p-3 space-y-1.5 lg:sticky lg:top-20 shadow-xl transition-all duration-300 ${
+            submenuRecolhido ? 'w-full lg:w-16' : 'w-full lg:w-64'
+          }`}
+        >
+          {/* Header do Submenu com Botão de Recolher/Expandir */}
+          <div className="px-2 py-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-500 border-b border-[#232532] mb-1 flex items-center justify-between">
+            {!submenuRecolhido && (
+              <div className="flex items-center gap-1.5">
+                <span>Submenu Logística</span>
+                <span className="text-orange-400 font-mono text-[9px] bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/30">
+                  4 Módulos
+                </span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleToggleSubmenuRecolhido}
+              className={`p-1 hover:bg-[#232532] rounded text-zinc-400 hover:text-white transition-colors cursor-pointer ${
+                submenuRecolhido ? 'mx-auto' : ''
+              }`}
+              title={submenuRecolhido ? 'Expandir Submenu de Logística' : 'Recolher Submenu de Logística'}
+              aria-label={submenuRecolhido ? 'Expandir Submenu' : 'Recolher Submenu'}
+            >
+              {submenuRecolhido ? (
+                <ChevronRight className="w-4 h-4 text-orange-400" />
+              ) : (
+                <ChevronLeft className="w-4 h-4 text-zinc-400 hover:text-white" />
+              )}
+            </button>
+          </div>
+
+          {/* 1. Monitor de Despacho */}
+          <button
+            type="button"
+            onClick={() => handleSubTabSelect('despacho')}
+            className={`w-full flex items-center ${
+              submenuRecolhido ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5'
+            } rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
+              activeSubTab === 'despacho'
+                ? 'bg-orange-500/20 text-orange-300 border border-orange-500/50 shadow-xs'
+                : 'text-zinc-400 hover:text-white hover:bg-[#1c1d29]'
+            }`}
+            title="Monitor de Despacho"
+          >
+            <div className="flex items-center gap-2.5">
+              <ChefHat className={`w-4 h-4 shrink-0 ${activeSubTab === 'despacho' ? 'text-orange-400' : 'text-zinc-400'}`} />
+              {!submenuRecolhido && <span>Monitor Despacho</span>}
+            </div>
+            {!submenuRecolhido && (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-orange-400 border border-orange-500/30">
+                {pedidosDeliveryMonitor.length}
+              </span>
+            )}
+          </button>
+
+          {/* 2. Motoboys & GPS */}
+          <button
+            type="button"
+            onClick={() => handleSubTabSelect('motoboy')}
+            className={`w-full flex items-center ${
+              submenuRecolhido ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5'
+            } rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
+              activeSubTab === 'motoboy'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-xs'
+                : 'text-zinc-400 hover:text-white hover:bg-[#1c1d29]'
+            }`}
+            title="Motoboys & Rastreamento GPS"
+          >
+            <div className="flex items-center gap-2.5">
+              <Navigation className={`w-4 h-4 shrink-0 ${activeSubTab === 'motoboy' ? 'text-cyan-400' : 'text-zinc-400'}`} />
+              {!submenuRecolhido && <span>Motoboys & GPS</span>}
+            </div>
+            {!submenuRecolhido && (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-cyan-400 border border-cyan-500/30">
+                {qtdEmEntrega} rota
+              </span>
+            )}
+          </button>
+
+          {/* 3. Entregas Concluídas */}
+          <button
+            type="button"
+            onClick={() => handleSubTabSelect('historico')}
+            className={`w-full flex items-center ${
+              submenuRecolhido ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5'
+            } rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
+              activeSubTab === 'historico'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-xs'
+                : 'text-zinc-400 hover:text-white hover:bg-[#1c1d29]'
+            }`}
+            title="Histórico de Entregas Concluídas"
+          >
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className={`w-4 h-4 shrink-0 ${activeSubTab === 'historico' ? 'text-emerald-400' : 'text-zinc-400'}`} />
+              {!submenuRecolhido && <span>Entregas Concluídas</span>}
+            </div>
+            {!submenuRecolhido && (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-emerald-400 border border-emerald-500/30">
+                {pedidosEntregues.length}
+              </span>
+            )}
+          </button>
+
+          {/* 4. Hardware & Impressão */}
+          <button
+            type="button"
+            onClick={() => handleSubTabSelect('hardware')}
+            className={`w-full flex items-center ${
+              submenuRecolhido ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5'
+            } rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
+              activeSubTab === 'hardware'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-xs'
+                : 'text-zinc-400 hover:text-white hover:bg-[#1c1d29]'
+            }`}
+            title="Hardware, Conexão e Impressão Térmica"
+          >
+            <div className="flex items-center gap-2.5">
+              <Printer className={`w-4 h-4 shrink-0 ${activeSubTab === 'hardware' ? 'text-amber-400' : 'text-zinc-400'}`} />
+              {!submenuRecolhido && <span>Hardware & Impressão</span>}
+            </div>
+            {!submenuRecolhido && (
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${autoPrintCozinha ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-zinc-800 text-zinc-400'}`}>
+                {autoPrintCozinha ? 'AUTO' : 'OFF'}
+              </span>
+            )}
+          </button>
+
+          {/* Indicadores do Salão & Delivery (visíveis quando expandido) */}
+          {!submenuRecolhido && (
+            <div className="pt-3 mt-3 border-t border-[#232532] text-[11px] text-zinc-400 space-y-2 px-1 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <span>Auto-Print Chapa:</span>
+                <span className={`font-bold ${autoPrintCozinha ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                  {autoPrintCozinha ? 'Ativo' : 'Desligado'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Total Pedidos Turno:</span>
+                <span className="font-mono font-bold text-white">{pedidos.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Total Finalizado:</span>
+                <span className="font-mono font-bold text-emerald-400">
+                  R$ {faturamentoEntregas.toFixed(2).replace('.', ',')}
+                </span>
+              </div>
+            </div>
+          )}
+        </aside>
+
+        {/* ÁREA DE CONTEÚDO PRINCIPAL DE LOGÍSTICA */}
+        <div className="flex-1 min-w-0 w-full">
+          {/* ======================================================== */}
+          {/* MODO 1: MONITOR DE DELIVERY & DESPACHO */}
+          {/* ======================================================== */}
+          {activeSubTab === 'despacho' && (
         <div className="space-y-6 animate-fadeIn">
           {/* Header do Monitor de Logística */}
           <header className="border-b-2 border-[#ff4b2b] pb-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-[#ff4b2b] flex items-center gap-2">
-                <span>🛵 Monitor de Delivery & Despacho</span>
+                <span>Monitor de Delivery & Despacho</span>
               </h1>
               <span className="text-sm text-[#888]">
                 {restaurant.name || 'Dom Gabriel Hamburgueria'}
@@ -672,121 +801,147 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
                 <ChefHat className="w-10 h-10 text-zinc-600 mx-auto mb-2" />
                 <p className="text-sm font-semibold">Nenhum pedido no fluxo de entrega no momento.</p>
                 <p className="text-xs text-zinc-500 mt-1">
-                  Novos pedidos feitos pelos clientes aparecem aqui automaticamente em tempo real!
+                  Novos pedidos feitos pelos clientes no cardápio ou no balcão aparecem aqui automaticamente em tempo real!
                 </p>
-                <button
-                  type="button"
-                  onClick={handleCriarPedidoTeste}
-                  className="mt-4 px-4 py-2 rounded-xl bg-[#ff4b2b] hover:bg-[#e03d1e] text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-md"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Criar Pedido de Teste</span>
-                </button>
               </div>
             ) : (
               pedidosDeliveryMonitor.map((pedido) => {
                 const id = pedido.id;
-                const statusNormalizado =
-                  pedido.status === 'em_preparo' ? 'preparando' : pedido.status === 'pronto_entrega' ? 'pronto' : pedido.status;
+                const status = pedido.status;
+                const numeroIdentificador =
+                  pedido.numeroSequencial || (pedido.id ? pedido.id.substring(0, 5).toUpperCase() : '0000');
 
                 let statusBadge = null;
                 let botaoAcao = null;
+                let bordaDestaqueEstilo = 'border-[#282a36]';
+                let badgeAlertaEntregador = null;
 
-                if (statusNormalizado === 'pendente') {
+                // 🚨 ENGENHARIA DE ALERTAS EM TEMPO REAL:
+                if (status === 'pendente') {
                   statusBadge = (
-                    <span className="inline-block py-0.5 px-2 rounded-md text-[11px] font-bold ml-1.5 bg-[#ffb86c] text-[#282a36]">
-                      Aguardando Cozinha
+                    <span className="inline-block py-0.5 px-2 rounded-md text-[11px] font-bold bg-[#ffb86c]/20 text-[#ffb86c] border border-[#ffb86c]/40">
+                      PENDENTE
                     </span>
                   );
                   botaoAcao = (
                     <button
                       type="button"
                       onClick={() => avancarLogistica(id, 'preparando')}
-                      className="w-full border-none py-3 px-4 rounded-lg font-bold cursor-pointer text-white text-sm mt-3.5 bg-[#007bff] hover:bg-[#0069d9] transition-all shadow-xs flex items-center justify-center gap-1.5"
+                      className="w-full border-none py-2.5 px-4 rounded-lg font-bold cursor-pointer text-white text-xs mt-3.5 bg-[#007bff] hover:bg-[#0069d9] transition-all shadow-xs flex items-center justify-center gap-1.5"
                     >
                       <ChefHat className="w-4 h-4" />
-                      <span>👨‍🍳 Iniciar Preparo</span>
+                      <span>👨‍🍳 Aceitar e Preparar</span>
                     </button>
                   );
-                } else if (statusNormalizado === 'preparando') {
+                } else if (status === 'preparando' || status === 'em_preparo') {
                   statusBadge = (
-                    <span className="inline-block py-0.5 px-2 rounded-md text-[11px] font-bold ml-1.5 bg-[#8be9fd] text-[#282a36]">
-                      Na Cozinha
+                    <span className="inline-block py-0.5 px-2 rounded-md text-[11px] font-bold bg-[#8be9fd]/20 text-[#8be9fd] border border-[#8be9fd]/40">
+                      PREPARANDO
                     </span>
                   );
                   botaoAcao = (
                     <button
                       type="button"
-                      onClick={() => avancarLogistica(id, 'pronto')}
-                      className="w-full border-none py-3 px-4 rounded-lg font-bold cursor-pointer text-white text-sm mt-3.5 bg-[#28a745] hover:bg-[#218838] transition-all shadow-xs flex items-center justify-center gap-1.5"
+                      onClick={() => avancarLogistica(id, 'pronto_entrega')}
+                      className="w-full border-none py-2.5 px-4 rounded-lg font-bold cursor-pointer text-white text-xs mt-3.5 bg-[#28a745] hover:bg-[#218838] transition-all shadow-xs flex items-center justify-center gap-1.5"
                     >
-                      <Check className="w-4 h-4" />
-                      <span>✅ Pronto / Chamar Motoboy</span>
+                      <Package className="w-4 h-4" />
+                      <span>📦 Enviar p/ Entregador</span>
                     </button>
                   );
-                } else if (statusNormalizado === 'pronto') {
+                } else if (status === 'pronto_entrega' || status === 'pronto') {
                   statusBadge = (
-                    <span className="inline-block py-0.5 px-2 rounded-md text-[11px] font-bold ml-1.5 bg-[#50fa7b] text-[#282a36]">
-                      Aguardando Entrega
+                    <span className="inline-block py-0.5 px-2 rounded-md text-[11px] font-bold bg-[#50fa7b]/20 text-[#50fa7b] border border-[#50fa7b]/40">
+                      PRONTO ENTREGA
                     </span>
                   );
                   botaoAcao = (
-                    <div className="space-y-2 mt-3.5">
-                      <button
-                        type="button"
-                        disabled
-                        className="w-full border-none py-3 px-4 rounded-lg font-bold text-sm bg-[#444] text-[#ccc] cursor-not-allowed opacity-90"
-                      >
-                        Aguardando Motoboy retirar...
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setModoPainel('motoboy');
-                          alternarRastreamentoGPS(id);
-                        }}
-                        className="w-full border-none py-2 px-3 rounded-lg font-bold text-xs bg-[#00b37e] hover:bg-[#009468] text-white cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-xs"
-                        title="Ativar GPS e iniciar corrida deste pedido"
-                      >
-                        <Truck className="w-3.5 h-3.5" />
-                        <span>🚚 Iniciar Entrega (Ativar GPS)</span>
-                      </button>
+                    <p className="text-center text-[#8d8d99] text-xs font-semibold mt-3.5 py-1">
+                      Aguardando motoboy coletar na bancada... ⏳
+                    </p>
+                  );
+                }
+                // 🛵 QUANDO O ENTREGADOR ATIVA O GPS NO CELULAR:
+                else if (status === 'saiu_para_entrega' || status === 'saiu_entrega') {
+                  bordaDestaqueEstilo = 'border-2 border-[#ff9f1c] bg-[#1e1b15] shadow-[0_0_20px_rgba(255,159,28,0.2)]';
+                  badgeAlertaEntregador = (
+                    <div className="bg-[#ff9f1c] text-[#111] text-[11px] font-bold py-1.5 px-3 rounded-md text-center mb-2.5 animate-pulse flex items-center justify-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>⚡ Iniciando Entrega</span>
                     </div>
+                  );
+                  statusBadge = (
+                    <span className="inline-block py-0.5 px-2 rounded-md text-[11px] font-bold bg-[#ff9f1c]/20 text-[#ff9f1c] border border-[#ff9f1c]/40">
+                      EM ROTA
+                    </span>
+                  );
+                  botaoAcao = (
+                    <p className="text-center text-[#ff9f1c] text-xs font-bold mt-2.5 py-1 flex items-center justify-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 animate-bounce" />
+                      <span>Rastreando Motoboy via GPS... 📍</span>
+                    </p>
+                  );
+                }
+                // 🏁 QUANDO O ENTREGADOR CONCLUI A CORRIDA NO CELULAR:
+                else if (status === 'entregue') {
+                  bordaDestaqueEstilo = 'border-2 border-[#00b37e] opacity-90 shadow-[0_0_20px_rgba(0,179,126,0.2)]';
+                  badgeAlertaEntregador = (
+                    <div className="bg-[#00b37e] text-white text-[11px] font-bold py-1.5 px-3 rounded-md text-center mb-2.5 flex items-center justify-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>✅ Entrega Finalizada</span>
+                    </div>
+                  );
+                  statusBadge = (
+                    <span className="inline-block py-0.5 px-2 rounded-md text-[11px] font-bold bg-[#00b37e]/20 text-[#00b37e] border border-[#00b37e]/40">
+                      ENTREGUE
+                    </span>
+                  );
+                  botaoAcao = (
+                    <button
+                      type="button"
+                      onClick={() => arquivarPedido(id)}
+                      className="w-full border-none py-2.5 px-4 rounded-lg font-bold cursor-pointer text-zinc-300 hover:text-white text-xs mt-3.5 bg-[#29292e] hover:bg-[#383a48] transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      <span>Arquivar Pedido</span>
+                    </button>
                   );
                 }
 
                 return (
                   <div
                     key={id}
-                    className="bg-[#181922] rounded-[14px] border border-[#282a36] p-[18px] shadow-[0_4px_15px_rgba(0,0,0,0.3)] hover:border-[#ff4b2b55] transition-all flex flex-col justify-between"
+                    className={`bg-[#181922] rounded-[14px] border ${bordaDestaqueEstilo} p-[18px] shadow-[0_4px_15px_rgba(0,0,0,0.3)] transition-all flex flex-col justify-between`}
                   >
                     <div>
-                      <p className="font-bold text-[#00b37e] text-sm uppercase flex items-center justify-between">
-                        <span>Pedido #{id.substring(0, 5).toUpperCase()}</span>
+                      {badgeAlertaEntregador}
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="font-mono font-bold text-amber-400 text-sm">
+                          #{numeroIdentificador}
+                        </span>
                         {statusBadge}
+                      </div>
+
+                      <p className="text-[14px] font-bold text-white mb-1">
+                        Pedido Viagem / Entrega
                       </p>
 
-                      <p className="mt-2.5 text-[15px] text-white">
-                        <strong className="text-zinc-300">Cliente:</strong>{' '}
+                      <p className="text-[12px] text-zinc-300 mb-1">
+                        <strong className="text-zinc-400">Cliente:</strong>{' '}
                         <span>{pedido.clienteNome || 'Consumidor'}</span>
                       </p>
 
-                      <p className="text-[13px] text-[#aaa] mt-1">
-                        <strong className="text-zinc-400">Endereço:</strong>{' '}
-                        <span>
-                          {pedido.endereco || 'Retirada no Balcão'}
-                          {pedido.bairro ? ` - ${pedido.bairro}` : ''}
-                        </span>
+                      <p className="text-[12px] text-zinc-400 mb-2">
+                        📍 {pedido.endereco || 'Retirada no Balcão'}
+                        {pedido.bairro ? ` - ${pedido.bairro}` : ''}
                       </p>
 
-                      <p className="text-[13px] text-[#ffb86c] mt-1.5">
-                        <strong className="text-zinc-400">Itens:</strong>{' '}
-                        <span>{formatarItensTexto(pedido.itens)}</span>
-                      </p>
+                      <div className="bg-[#20212c] p-2.5 rounded-lg text-xs text-zinc-200 mb-2.5 border border-[#2c2e3c]">
+                        {formatarItensTexto(pedido.itens)}
+                      </div>
 
                       {pedido.total > 0 && (
-                        <p className="text-[13px] text-[#00b37e] font-bold mt-1.5">
-                          <strong>Total:</strong> R$ {pedido.total.toFixed(2).replace('.', ',')}
+                        <p className="text-[12px] text-[#00b37e] font-mono font-bold">
+                          Total: R$ {pedido.total.toFixed(2).replace('.', ',')}
                         </p>
                       )}
                     </div>
@@ -826,7 +981,7 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
       {/* ======================================================== */}
       {/* MODO 2: APP DO ENTREGADOR / MOTOBOY COM GPS AO VIVO */}
       {/* ======================================================== */}
-      {modoPainel === 'motoboy' && (
+      {activeSubTab === 'motoboy' && (
         <div className="space-y-6 animate-fadeIn">
           {/* Header do App do Motoboy */}
           <header className="border-b border-[#333] pb-4 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1113,6 +1268,253 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
           </main>
         </div>
       )}
+
+      {/* ======================================================== */}
+      {/* MODO 3: HISTÓRICO DE ENTREGAS CONCLUÍDAS */}
+      {/* ======================================================== */}
+      {activeSubTab === 'historico' && (
+        <div className="space-y-6 animate-fadeIn">
+          <header className="border-b-2 border-emerald-500 pb-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-emerald-400 flex items-center gap-2">
+                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                <span>Entregas Concluídas</span>
+              </h1>
+              <span className="text-sm text-zinc-400">
+                Histórico de pedidos entregues e faturamento do turno
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-[#181922] text-emerald-400 border border-emerald-500/30">
+                {pedidosEntregues.length} entregas finalizadas
+              </span>
+              <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-emerald-950/70 text-emerald-300 border border-emerald-600/40">
+                Total: R$ {faturamentoEntregas.toFixed(2).replace('.', ',')}
+              </span>
+            </div>
+          </header>
+
+          {pedidosEntregues.length === 0 ? (
+            <div className="text-center py-12 px-4 bg-[#14151e] rounded-2xl border border-dashed border-[#282a36] text-zinc-400">
+              <CheckCircle2 className="w-10 h-10 text-zinc-600 mx-auto mb-2" />
+              <p className="text-sm font-semibold">Nenhuma entrega concluída ainda neste turno.</p>
+              <p className="text-xs text-zinc-500 mt-1">
+                À medida que os motoboys finalizarem as entregas, o registro completo aparecerá aqui.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pedidosEntregues.map((pedido) => (
+                <div
+                  key={pedido.id}
+                  className="bg-[#181922] border border-emerald-900/40 rounded-2xl p-4 shadow-md flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between border-b border-[#282a36] pb-2.5 mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-extrabold text-white">
+                          #{pedido.numeroSequencial || pedido.numeroPedido}
+                        </span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          Entregue
+                        </span>
+                      </div>
+                      <span className="text-xs text-zinc-400 font-mono">
+                        {pedido.entregueEm
+                          ? new Date(pedido.entregueEm).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : 'Finalizado'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs text-zinc-300 mb-3">
+                      <div>
+                        <strong className="text-white">Cliente:</strong> {pedido.clienteNome}
+                        {pedido.clienteTelefone && (
+                          <span className="text-zinc-500 ml-1">({pedido.clienteTelefone})</span>
+                        )}
+                      </div>
+                      <div className="text-zinc-400">
+                        <strong className="text-zinc-300">Endereço:</strong> {pedido.endereco} {pedido.complemento || ''}
+                      </div>
+                      <div className="text-zinc-400">
+                        <strong className="text-zinc-300">Itens:</strong> {formatarItensTexto(pedido.itens)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-[#282a36] flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold block">Valor Pago</span>
+                      <span className="text-sm font-extrabold text-emerald-400">
+                        R$ {Number(pedido.total).toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleImprimirEntrega(pedido)}
+                      className="px-3 py-1.5 rounded-lg bg-[#202028] hover:bg-[#282834] border border-zinc-700 text-xs font-bold text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Reimprimir comprovante de entrega na impressora térmica"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Reimprimir</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODO 4: HARDWARE & IMPRESSORAS DE DELIVERY */}
+      {/* ======================================================== */}
+      {activeSubTab === 'hardware' && (
+        <div className="space-y-6 animate-fadeIn">
+          <header className="border-b-2 border-amber-500 pb-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-amber-400 flex items-center gap-2">
+                <Printer className="w-6 h-6 text-amber-400" />
+                <span>Hardware & Impressão de Delivery</span>
+              </h1>
+              <span className="text-sm text-zinc-400">
+                Configuração de impressoras térmicas ESC/POS (USB/Serial e Bluetooth)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-mono font-bold px-3 py-1 rounded-full border ${
+                autoPrintCozinha
+                  ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40'
+                  : 'bg-zinc-900 text-zinc-400 border-zinc-700'
+              }`}>
+                Auto-Print: {autoPrintCozinha ? 'LIGADO' : 'DESLIGADO'}
+              </span>
+            </div>
+          </header>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Card 1: Auto-Impressão da Cozinha */}
+            <div className="bg-[#181922] border border-[#282a36] rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">⚡</span>
+                    <h3 className="text-base font-extrabold text-white">Auto-Impressão na Cozinha</h3>
+                  </div>
+                  <span className={`w-3 h-3 rounded-full ${autoPrintCozinha ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                  Quando ativado, todo novo pedido de delivery recebido com status pendente dispara automaticamente o cupom para a chapa na impressora térmica USB sem necessidade de clique manual.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const novo = !autoPrintCozinha;
+                  setAutoPrintCozinha(novo);
+                  try {
+                    localStorage.setItem('domgabriel_autoprint_cozinha', String(novo));
+                  } catch {}
+                }}
+                className={`w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
+                  autoPrintCozinha
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
+                }`}
+              >
+                <span>{autoPrintCozinha ? '✅ Auto-Impressão Ativada (Clique para Pausar)' : '▶️ Ativar Auto-Impressão Imediata'}</span>
+              </button>
+            </div>
+
+            {/* Card 2: Impressora Térmica USB / Serial */}
+            <div className="bg-[#181922] border border-[#282a36] rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">🔌</span>
+                    <h3 className="text-base font-extrabold text-white">Impressora USB / Serial (ESC/POS)</h3>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                    ESC/POS
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                  Comunicação direta via Web Serial com impressoras térmicas não-fiscais de 58mm e 80mm (Bematech, Daruma, Epson, Elgin).
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleTestarImpressora}
+                className="w-full py-3 px-4 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/60 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+              >
+                <Printer className="w-4 h-4" />
+                <span>🖨️ Disparar Cupom Teste na Chapa (USB)</span>
+              </button>
+            </div>
+
+            {/* Card 3: Impressora Bluetooth Sem Fio */}
+            <div className="bg-[#181922] border border-[#282a36] rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">📱</span>
+                    <h3 className="text-base font-extrabold text-white">Impressora Bluetooth Sem Fio</h3>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">
+                    Sem Fio
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                  Pareamento com mini-impressoras Bluetooth portáteis para impressão via celular, tablet ou caixa móvel.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConectarBluetooth}
+                className="w-full py-3 px-4 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/60 text-cyan-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.2)]"
+              >
+                <span>📱 Conectar / Parear Bluetooth</span>
+              </button>
+            </div>
+
+            {/* Card 4: Suporte e Diagnóstico */}
+            <div className="bg-[#181922] border border-[#282a36] rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span className="text-2xl">ℹ️</span>
+                  <h3 className="text-base font-extrabold text-white">Diagnóstico do Navegador</h3>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-[#282a36]">
+                    <span className="text-zinc-400">Web Serial API (USB):</span>
+                    <span className={`font-bold ${isSerialSupported() ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {isSerialSupported() ? 'Suportada' : 'Não Suportada neste Navegador'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-[#282a36]">
+                    <span className="text-zinc-400">Web Bluetooth API:</span>
+                    <span className={`font-bold ${isBluetoothSupported() ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {isBluetoothSupported() ? 'Suportada' : 'Não Suportada neste Navegador'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-zinc-500 mt-4 text-center">
+                Para compatibilidade total com impressoras USB e Bluetooth, recomendamos Google Chrome ou Edge.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
 
       {/* Dica de Utilização no Rodapé */}
       <footer className="mt-8 pt-4 border-t border-[#282a36] text-center text-xs text-[#777] space-y-1">

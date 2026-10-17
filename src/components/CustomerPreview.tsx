@@ -234,6 +234,7 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
       setNumeroMesa(numFmt);
       setMesaFixoQrCode(numeroMesaQr);
       localStorage.setItem('numeroMesaFixoDoQrCode', numeroMesaQr);
+      localStorage.setItem('mesaAtivaQrCode', numeroMesaQr);
     }
   }, [trocarModoOla]);
 
@@ -645,21 +646,30 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
     const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
 
     // Grava o pedido em tempo real na coleção "pedidos" do Firebase para o Painel do Entregador
+    let numeroDoPedidoAtual = parseInt(localStorage.getItem('contadorPedidosTurno') || '0') || 0;
+    numeroDoPedidoAtual += 1;
+    localStorage.setItem('contadorPedidosTurno', String(numeroDoPedidoAtual));
+    const numSequencialStr = String(numeroDoPedidoAtual).padStart(2, '0');
+
     const numPedido = Math.floor(1000 + Math.random() * 9000);
     const novoPedidoParaEntregador: DeliveryOrder = {
       id: `pedido-${numPedido}`,
       numeroPedido: numPedido,
+      numeroSequencial: numSequencialStr,
       clienteNome: nomeCliente.trim(),
       clienteTelefone: telefoneCliente.trim(),
       endereco: modoAtendimento === 'delivery' ? (enderecoEntrega.trim() || 'Entrega com GPS informado') : `Mesa ${numeroMesa}`,
       complemento: complemento.trim(),
-      itens: carrinho.map((it) => ({
-        nome: it.dish.name,
-        quantidade: it.quantity,
-        preco: it.dish.price,
-        adicionais: it.selectedAddons?.map((a) => a.name),
-        observacao: it.observacaoItem,
-      })),
+      itens: carrinho.map((it) => {
+        const addonsPrice = (it.selectedAddons || []).reduce((s, a) => s + (Number(a.price) || 0), 0);
+        return {
+          nome: it.dish.name,
+          quantidade: it.quantity,
+          preco: it.dish.price + addonsPrice,
+          adicionais: it.selectedAddons?.map((a) => `${a.name} (+ R$ ${a.price.toFixed(2).replace('.', ',')})`),
+          observacao: it.observacaoItem,
+        };
+      }),
       total: totalSacola,
       formaPagamento:
         formaPagamento === 'pix'

@@ -84,6 +84,7 @@ export interface DeliveryOrderItem {
 export interface DeliveryOrder {
   id: string;
   numeroPedido: number | string;
+  numeroSequencial?: string;
   clienteNome: string;
   clienteTelefone?: string;
   tipo?: string;
@@ -105,6 +106,7 @@ export interface DeliveryOrder {
     | 'saiu_para_entrega'
     | 'saiu_entrega'
     | 'entregue'
+    | 'arquivado'
     | 'cancelado'
     | 'recusado';
   localizacaoEntregador?: DeliveryLocation;

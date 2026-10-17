@@ -1,8 +1,32 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Store, Check, Camera, Upload, Link, Trash2, Plus, Image as ImageIcon, RefreshCw, Globe, CheckCircle2, Clock } from 'lucide-react';
+import {
+  X,
+  Store,
+  Check,
+  Camera,
+  Upload,
+  Link,
+  Trash2,
+  Plus,
+  Image as ImageIcon,
+  RefreshCw,
+  Globe,
+  CheckCircle2,
+  Clock,
+  Printer,
+  Smartphone,
+  AlertCircle,
+  Radio,
+} from 'lucide-react';
 import { RestaurantConfig, BannerItem } from '../types';
 import { extrairUrlImagemGoogle, testarCarregamentoImagem } from '../utils/imageUtils';
 import { verificarLojaAberta } from '../data/initialMenu';
+import {
+  testarImpressoraTermica,
+  conectarImpressoraBluetooth,
+  isBluetoothSupported,
+  isSerialSupported,
+} from '../utils/thermalPrinter';
 
 interface RestaurantSettingsModalProps {
   isOpen: boolean;
@@ -17,9 +41,52 @@ export const RestaurantSettingsModal: React.FC<RestaurantSettingsModalProps> = (
   config,
   onSave,
 }) => {
-  const [activeTab, setActiveTab] = useState<'dados' | 'banners'>('dados');
+  const [activeTab, setActiveTab] = useState<'dados' | 'banners' | 'impressao'>('dados');
   const [formData, setFormData] = useState<RestaurantConfig>(config);
   const [toastBanner, setToastBanner] = useState<string | null>(null);
+
+  // Estados para Teste de Impressora Térmica USB e Conexão Bluetooth
+  const [testandoTermica, setTestandoTermica] = useState(false);
+  const [conectandoBluetooth, setConectandoBluetooth] = useState(false);
+  const [feedbackImpressao, setFeedbackImpressao] = useState<{ tipo: 'sucesso' | 'erro'; msg: string } | null>(null);
+
+  const handleTestarTermicaUSB = async () => {
+    setTestandoTermica(true);
+    setFeedbackImpressao(null);
+    try {
+      const res = await testarImpressoraTermica();
+      setFeedbackImpressao({
+        tipo: res.sucesso ? 'sucesso' : 'erro',
+        msg: res.mensagem,
+      });
+    } catch (err: any) {
+      setFeedbackImpressao({
+        tipo: 'erro',
+        msg: 'Falha na impressora USB/Serial: ' + (err?.message || 'Verifique o cabo USB e a porta serial.'),
+      });
+    } finally {
+      setTestandoTermica(false);
+    }
+  };
+
+  const handleConectarBluetooth = async () => {
+    setConectandoBluetooth(true);
+    setFeedbackImpressao(null);
+    try {
+      const res = await conectarImpressoraBluetooth();
+      setFeedbackImpressao({
+        tipo: res.sucesso ? 'sucesso' : 'erro',
+        msg: res.mensagem,
+      });
+    } catch (err: any) {
+      setFeedbackImpressao({
+        tipo: 'erro',
+        msg: 'Falha no pareamento Bluetooth: ' + (err?.message || 'Verifique se o Bluetooth do aparelho está ativado.'),
+      });
+    } finally {
+      setConectandoBluetooth(false);
+    }
+  };
 
   // Sincroniza sempre que as configurações mudam ou o modal abre
   useEffect(() => {
@@ -223,12 +290,12 @@ export const RestaurantSettingsModal: React.FC<RestaurantSettingsModalProps> = (
           </button>
         </div>
 
-        {/* Abas: Dados da Loja vs Banners do Carrossel */}
-        <div className="flex gap-2 pt-4 pb-2 border-b border-zinc-900">
+        {/* Abas: Dados da Loja vs Banners do Carrossel vs Impressão & Bluetooth */}
+        <div className="flex gap-2 pt-4 pb-2 border-b border-zinc-900 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('dados')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'dados'
                 ? 'bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.5)]'
                 : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
@@ -239,14 +306,26 @@ export const RestaurantSettingsModal: React.FC<RestaurantSettingsModalProps> = (
           <button
             type="button"
             onClick={() => setActiveTab('banners')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'banners'
                 ? 'bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.5)]'
                 : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
             }`}
           >
             <ImageIcon className="w-3.5 h-3.5" />
-            <span>🎠 Banners do Carrossel ({currentBannersList.length})</span>
+            <span>🎠 Banners ({currentBannersList.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('impressao')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'impressao'
+                ? 'bg-cyan-400 text-black shadow-[0_0_12px_rgba(34,211,238,0.5)]'
+                : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+            }`}
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>🖨️ Impressão & Bluetooth</span>
           </button>
         </div>
 
@@ -465,7 +544,7 @@ export const RestaurantSettingsModal: React.FC<RestaurantSettingsModalProps> = (
               </button>
             </div>
           </form>
-        ) : (
+        ) : activeTab === 'banners' ? (
           <div className="pt-4 space-y-5">
             {toastBanner && (
               <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
@@ -737,6 +816,140 @@ export const RestaurantSettingsModal: React.FC<RestaurantSettingsModalProps> = (
               >
                 <Check className="w-4 h-4 text-black" />
                 <span>Salvar Banners</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Aba: Impressão & Bluetooth (ESC/POS) */
+          <div className="pt-4 space-y-5">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Printer className="w-4 h-4 text-orange-400" />
+                <span>Hardware de Impressão & Conexão Sem Fio</span>
+              </h3>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Configure e teste impressoras térmicas ESC/POS via cabo USB/Serial e faça pareamento com mini-impressoras Bluetooth.
+              </p>
+            </div>
+
+            {/* Alerta de Feedback de Teste / Conexão */}
+            {feedbackImpressao && (
+              <div
+                className={`p-3.5 rounded-xl text-xs font-bold flex items-start gap-2.5 shadow-lg animate-fadeIn ${
+                  feedbackImpressao.tipo === 'sucesso'
+                    ? 'bg-emerald-950/90 border border-emerald-500/60 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                    : 'bg-rose-950/90 border border-rose-500/60 text-rose-200 shadow-[0_0_15px_rgba(244,63,94,0.3)]'
+                }`}
+              >
+                {feedbackImpressao.tipo === 'sucesso' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1">
+                  <p className="leading-relaxed">{feedbackImpressao.msg}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFeedbackImpressao(null)}
+                  className="text-zinc-400 hover:text-white text-xs px-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Card 1: Impressora Térmica USB / Serial */}
+            <div className="bg-[#121318] p-4 rounded-xl border border-orange-500/30 hover:border-orange-500/60 transition-all shadow-md">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-orange-500/15 border border-orange-500/40 flex items-center justify-center text-orange-400 shrink-0">
+                    <Printer className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Impressora Térmica USB / Serial</h4>
+                    <p className="text-[11px] text-zinc-400">Padrão ESC/POS (Epson, Bematech, Elgin, Daruma, POS-58/80)</p>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                  isSerialSupported()
+                    ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                    : 'bg-zinc-900 text-zinc-500 border-zinc-800'
+                }`}>
+                  {isSerialSupported() ? 'Web Serial OK' : 'Sem Web Serial'}
+                </span>
+              </div>
+
+              <p className="text-xs text-zinc-300 leading-relaxed mb-4">
+                Comunicação direta via cabo USB com envio de comandos ESC/POS puros a 9600 baud, corte automático de guilhotina e aviso sonoro de nova comanda.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleTestarTermicaUSB}
+                disabled={testandoTermica}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-400 text-black font-extrabold text-xs rounded-xl transition-all shadow-[0_0_15px_rgba(249,115,22,0.4)] hover:shadow-[0_0_20px_rgba(249,115,22,0.6)] cursor-pointer disabled:opacity-50"
+              >
+                <Printer className="w-4 h-4 text-black" />
+                <span>{testandoTermica ? 'Disparando Teste de Impressão...' : 'Testar Térmica USB'}</span>
+              </button>
+            </div>
+
+            {/* Card 2: Impressora Sem Fio Bluetooth */}
+            <div className="bg-[#121318] p-4 rounded-xl border border-cyan-500/30 hover:border-cyan-500/60 transition-all shadow-md">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Impressora Bluetooth Sem Fio</h4>
+                    <p className="text-[11px] text-zinc-400">Mini-impressoras térmicas portáteis (58mm / 80mm)</p>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                  isBluetoothSupported()
+                    ? 'bg-cyan-950 text-cyan-400 border-cyan-800'
+                    : 'bg-amber-950 text-amber-400 border-amber-800'
+                }`}>
+                  {isBluetoothSupported() ? 'Web Bluetooth OK' : 'Não Suportado'}
+                </span>
+              </div>
+
+              <p className="text-xs text-zinc-300 leading-relaxed mb-4">
+                Permite parear via Web Bluetooth com impressoras móveis de garçom, tablets e celulares para imprimir pedidos e fechamentos no salão sem fios.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleConectarBluetooth}
+                disabled={conectandoBluetooth}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs rounded-xl transition-all shadow-[0_0_15px_rgba(34,211,238,0.4)] hover:shadow-[0_0_20px_rgba(34,211,238,0.6)] cursor-pointer disabled:opacity-50"
+              >
+                <Radio className="w-4 h-4 text-black animate-pulse" />
+                <span>{conectandoBluetooth ? 'Buscando Dispositivo Bluetooth...' : '📱 Conectar / Parear Bluetooth'}</span>
+              </button>
+            </div>
+
+            {/* Dicas e Requisitos Técnicos */}
+            <div className="p-3.5 rounded-xl bg-black/60 border border-zinc-800 text-xs text-zinc-400 space-y-1.5">
+              <div className="font-bold text-zinc-200 flex items-center gap-1.5">
+                <span>💡 Dicas de Compatibilidade:</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-[11px] text-zinc-400 pl-1">
+                <li>Utilize o navegador <strong>Google Chrome</strong> ou <strong>Microsoft Edge</strong> para suporte pleno a portas USB e Bluetooth.</li>
+                <li>Para impressoras térmicas USB, mantenha conectada à porta com velocidade padrão de 9600 baud.</li>
+                <li>Caso o navegador solicite permissão, selecione o dispositivo na lista popup e clique em <em>Conectar</em> ou <em>Parear</em>.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-900">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                Fechar
               </button>
             </div>
           </div>
