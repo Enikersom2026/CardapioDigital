@@ -45,92 +45,11 @@ interface AtendimentoLocalPanelProps {
   onNavigateToControleMesa?: () => void;
 }
 
-// Comandas iniciais de demonstração caso esteja vazio
-const COMANDAS_INICIAIS: ComandaLocal[] = [
-  {
-    id: 'cmd-1',
-    numeroComanda: 'M-01',
-    tipo: 'mesa',
-    numeroMesa: 1,
-    clienteNome: 'Mesa 01',
-    clienteTelefone: '11987654321',
-    atendente: 'Pedro',
-    itens: [
-      { id: 'item-101', nome: 'X-Bacon Especial Dom Gabriel', preco: 34.9, quantidade: 2, adicionais: ['+ Bacon Crocante Extra', '+ Queijo Cheddar'], horaLancamento: '19:15' },
-      { id: 'item-102', nome: 'Batata Rústica com Alecrim', preco: 18.0, quantidade: 1, horaLancamento: '19:18' },
-      { id: 'item-103', nome: 'Coca-Cola Zero 350ml', preco: 6.5, quantidade: 2, horaLancamento: '19:18' },
-    ],
-    status: 'aberta',
-    subtotal: 100.8,
-    total: 100.8,
-    abertaEm: new Date(Date.now() - 45 * 60000).toISOString(),
-  },
-  {
-    id: 'cmd-3',
-    numeroComanda: 'M-03',
-    tipo: 'mesa',
-    numeroMesa: 3,
-    clienteNome: 'Mesa 03',
-    clienteTelefone: '11999887766',
-    atendente: 'Ana',
-    itens: [
-      { id: 'item-104', nome: 'Smash Burger Duplo 4Zero5', preco: 34.9, quantidade: 3, adicionais: ['+ Queijo Prato Derretido'], horaLancamento: '19:30' },
-      { id: 'item-105', nome: 'Suco Natural de Laranja 500ml', preco: 9.5, quantidade: 3, horaLancamento: '19:32' },
-      { id: 'item-106', nome: 'Porção Onion Rings Crocantes', preco: 22.0, quantidade: 1, horaLancamento: '19:35' },
-    ],
-    status: 'aberta',
-    subtotal: 155.2,
-    total: 155.2,
-    abertaEm: new Date(Date.now() - 30 * 60000).toISOString(),
-  },
-  {
-    id: 'cmd-b1',
-    numeroComanda: 'B-04',
-    tipo: 'balcao',
-    clienteNome: 'Juliana Castro (Para Viagem)',
-    atendente: 'Caixa',
-    itens: [
-      { id: 'item-107', nome: 'Dom Bacon Artesanal 180g', preco: 36.9, quantidade: 1, adicionais: ['+ Maionese Verde da Casa'], horaLancamento: '19:42' },
-      { id: 'item-108', nome: 'Cerveja Long Neck Heineken', preco: 12.0, quantidade: 1, horaLancamento: '19:42' },
-    ],
-    status: 'aberta',
-    subtotal: 48.9,
-    total: 48.9,
-    abertaEm: new Date(Date.now() - 15 * 60000).toISOString(),
-  },
-];
+// Comandas iniciais: VAZIO para início válido
+const COMANDAS_INICIAIS: ComandaLocal[] = [];
 
-const MOVIMENTOS_CAIXA_INICIAIS: MovimentoCaixa[] = [
-  {
-    id: 'mov-1',
-    tipo: 'abertura',
-    descricao: 'Abertura de Caixa (Fundo de Troco Inicial)',
-    formaPagamento: 'dinheiro',
-    valor: 150.0,
-    dataHora: new Date(Date.now() - 180 * 60000).toISOString(),
-    responsavel: 'Gerente / Caixa',
-  },
-  {
-    id: 'mov-2',
-    tipo: 'entrada_comanda',
-    descricao: 'Fechamento Comanda Mesa #05 (Lucas)',
-    numeroComanda: 'M-05',
-    formaPagamento: 'pix',
-    valor: 82.5,
-    dataHora: new Date(Date.now() - 60 * 60000).toISOString(),
-    responsavel: 'Caixa',
-  },
-  {
-    id: 'mov-3',
-    tipo: 'entrada_comanda',
-    descricao: 'Fechamento Comanda Balcão #02 (Carlos)',
-    numeroComanda: 'B-02',
-    formaPagamento: 'cartao_credito',
-    valor: 46.0,
-    dataHora: new Date(Date.now() - 35 * 60000).toISOString(),
-    responsavel: 'Caixa',
-  },
-];
+// Movimentos do Caixa iniciais: VAZIO para início válido
+const MOVIMENTOS_CAIXA_INICIAIS: MovimentoCaixa[] = [];
 
 export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
   restaurant,
@@ -168,10 +87,12 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
       const salvos = localStorage.getItem('domgabriel_comandas_locais');
       if (salvos) {
         const parsed = JSON.parse(salvos);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((c: any) => c && !['cmd-1', 'cmd-3', 'cmd-b1'].includes(c.id));
+        }
       }
     } catch {}
-    return COMANDAS_INICIAIS;
+    return [];
   });
 
   // Movimentos do Caixa
@@ -180,10 +101,12 @@ export const AtendimentoLocalPanel: React.FC<AtendimentoLocalPanelProps> = ({
       const salvos = localStorage.getItem('domgabriel_movimentos_caixa');
       if (salvos) {
         const parsed = JSON.parse(salvos);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((m: any) => m && !['mov-1', 'mov-2', 'mov-3'].includes(m.id));
+        }
       }
     } catch {}
-    return MOVIMENTOS_CAIXA_INICIAIS;
+    return [];
   });
 
   // Escuta Firestore e alterações de mesas em tempo real

@@ -20,9 +20,9 @@ export const PrintAndExport: React.FC<PrintAndExportProps> = ({ restaurant }) =>
   const [urlBase, setUrlBase] = useState<string>(() => {
     try {
       const origin = window.location.origin;
-      return `${origin}/cardapio.html`;
+      return origin && !origin.includes('localhost') ? `${origin}/cardapio.html` : 'https://netlify.app';
     } catch {
-      return 'https://web.app/cardapio.html';
+      return 'https://netlify.app';
     }
   });
 
@@ -143,13 +143,13 @@ export const PrintAndExport: React.FC<PrintAndExportProps> = ({ restaurant }) =>
           {/* Input da URL do Cardápio */}
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-              Link do seu Cardápio (URL do Firebase Hosting / Web App):
+              Link do seu Cardápio (URL do Servidor):
             </label>
             <input
               type="text"
               value={urlBase}
               onChange={(e) => setUrlBase(e.target.value)}
-              placeholder="https://sua-empresa.web.app/cardapio.html"
+              placeholder="https://netlify.app"
               className="w-full px-4 py-2.5 border border-[#29292e] bg-[#202024] text-white rounded-xl text-xs font-mono focus:outline-hidden focus:border-[#ff4b2b] transition-colors"
             />
             <span className="text-[11px] text-zinc-500 mt-1 block">

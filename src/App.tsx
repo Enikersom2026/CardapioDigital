@@ -137,6 +137,51 @@ export default function App() {
     });
   };
 
+  // Limpeza automática de dados fictícios residuais para garantir início 100% válido e zerado
+  useEffect(() => {
+    try {
+      const pedidosStr = localStorage.getItem('domgabriel_pedidos_entregador');
+      if (pedidosStr) {
+        const p = JSON.parse(pedidosStr);
+        if (Array.isArray(p)) {
+          const limpos = p.filter((x: any) => x && !x.id?.startsWith('pedido-1024') && !x.id?.startsWith('pedido-1025'));
+          localStorage.setItem('domgabriel_pedidos_entregador', JSON.stringify(limpos));
+        }
+      }
+      const comandasStr = localStorage.getItem('domgabriel_comandas_locais');
+      if (comandasStr) {
+        const c = JSON.parse(comandasStr);
+        if (Array.isArray(c)) {
+          const limpas = c.filter((x: any) => x && !['cmd-1', 'cmd-3', 'cmd-b1'].includes(x.id));
+          localStorage.setItem('domgabriel_comandas_locais', JSON.stringify(limpas));
+        }
+      }
+      const movsStr = localStorage.getItem('domgabriel_movimentos_caixa');
+      if (movsStr) {
+        const m = JSON.parse(movsStr);
+        if (Array.isArray(m)) {
+          const limpos = m.filter((x: any) => x && !['mov-1', 'mov-2', 'mov-3'].includes(x.id));
+          localStorage.setItem('domgabriel_movimentos_caixa', JSON.stringify(limpos));
+        }
+      }
+      const mesasStr = localStorage.getItem('domgabriel_mesas_salao');
+      if (mesasStr) {
+        const ms = JSON.parse(mesasStr);
+        if (Array.isArray(ms)) {
+          const limpas = ms.map((m: any) => {
+            if (m.cliente === 'Lucas & Amigos' || m.cliente === 'Família Silva' || m.cliente === 'Camila Santos') {
+              return { ...m, status: 'livre', cliente: undefined, garcom: undefined, itens: [], abertaEm: undefined };
+            }
+            return m;
+          });
+          localStorage.setItem('domgabriel_mesas_salao', JSON.stringify(limpas));
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao purgar dados demo:', err);
+    }
+  }, []);
+
   // Sync to both localStorage keys whenever menuItems changes
   useEffect(() => {
     try {

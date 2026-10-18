@@ -487,11 +487,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               {modo === 'cadastro_entregador' ? (
                 <div className="relative group flex flex-col items-center">
                   <img
-                    src="/src/assets/images/entregador_scooter_red_1791801019548.jpg"
+                    src="/entregador_scooter_red.jpg"
                     onError={(e) => {
                       const target = e.currentTarget;
-                      if (!target.src.includes('/entregador_scooter_red.jpg')) {
-                        target.src = '/entregador_scooter_red.jpg';
+                      if (!target.src.includes('/assets/images/entregador_scooter_red.jpg')) {
+                        target.src = '/assets/images/entregador_scooter_red.jpg';
                       }
                     }}
                     referrerPolicy="no-referrer"
@@ -504,11 +504,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </div>
               ) : (
                 <img
-                  src="/src/assets/images/emblema_dom_gabriel.png"
+                  src="/emblema_dom_gabriel.png"
                   onError={(e) => {
                     const target = e.currentTarget;
-                    if (!target.src.includes('/emblema_dom_gabriel.png')) {
-                      target.src = '/emblema_dom_gabriel.png';
+                    if (!target.src.includes('/assets/images/emblema_dom_gabriel.png')) {
+                      target.src = '/assets/images/emblema_dom_gabriel.png';
                     }
                   }}
                   referrerPolicy="no-referrer"

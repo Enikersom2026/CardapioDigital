@@ -56,12 +56,12 @@ interface MesaItem {
 }
 
 const MESAS_INICIAIS: MesaItem[] = [
-  { id: 'm-1', numero: 1, status: 'ocupada', cliente: 'Lucas & Amigos', garcom: 'Pedro', itens: [{ nome: 'X-Bacon Especial', preco: 32.9, qtd: 2 }, { nome: 'Batata Rústica', preco: 18.0, qtd: 1 }, { nome: 'Coca-Cola 350ml', preco: 6.5, qtd: 2 }], abertaEm: new Date(Date.now() - 40 * 60000).toISOString() },
+  { id: 'm-1', numero: 1, status: 'livre', itens: [] },
   { id: 'm-2', numero: 2, status: 'livre', itens: [] },
-  { id: 'm-3', numero: 3, status: 'ocupada', cliente: 'Família Silva', garcom: 'Ana', itens: [{ nome: 'Smash Burger Duplo', preco: 34.9, qtd: 3 }, { nome: 'Suco Natural', preco: 8.5, qtd: 3 }], abertaEm: new Date(Date.now() - 25 * 60000).toISOString() },
+  { id: 'm-3', numero: 3, status: 'livre', itens: [] },
   { id: 'm-4', numero: 4, status: 'livre', itens: [] },
   { id: 'm-5', numero: 5, status: 'livre', itens: [] },
-  { id: 'm-6', numero: 6, status: 'ocupada', cliente: 'Camila Santos', garcom: 'Pedro', itens: [{ nome: 'Dom Bacon Artesanal', preco: 36.9, qtd: 1 }, { nome: 'Cerveja Artesanal', preco: 14.0, qtd: 1 }], abertaEm: new Date(Date.now() - 15 * 60000).toISOString() },
+  { id: 'm-6', numero: 6, status: 'livre', itens: [] },
   { id: 'm-7', numero: 7, status: 'livre', itens: [] },
   { id: 'm-8', numero: 8, status: 'livre', itens: [] },
 ];
@@ -94,54 +94,18 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
     }
   };
 
-  // Pedidos sincronizados do Firestore e LocalStorage
+  // Pedidos sincronizados do Firestore e LocalStorage (Início Válido Zerado)
   const [pedidos, setPedidos] = useState<DeliveryOrder[]>(() => {
     try {
       const salvos = localStorage.getItem('domgabriel_pedidos_entregador');
       if (salvos) {
         const parsed = JSON.parse(salvos);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((p: any) => p && !p.id?.startsWith('pedido-1024') && !p.id?.startsWith('pedido-1025'));
+        }
       }
     } catch {}
-    return [
-      {
-        id: 'pedido-1024',
-        numeroPedido: 1024,
-        clienteNome: 'João Silva',
-        clienteTelefone: '11987654321',
-        endereco: 'Rua das Flores, 123',
-        bairro: 'Centro',
-        complemento: 'Apt 42 - Bloco B',
-        itens: [
-          { nome: 'X-Bacon Artesanal', quantidade: 1, preco: 32.9, adicionais: ['+ Bacon Crocante Extra', '+ Cheddar Cremoso'] },
-          { nome: 'Batatas Rústicas com Alecrim', quantidade: 1, preco: 18.0 },
-          { nome: 'Coca-Cola Zero 350ml', quantidade: 1, preco: 6.5 },
-        ],
-        total: 57.4,
-        formaPagamento: 'Cartão na Entrega',
-        observacoes: 'Tocar o interfone 42, deixar na portaria se demorar.',
-        status: 'pendente',
-        criadoEm: new Date(Date.now() - 15 * 60000).toISOString(),
-      },
-      {
-        id: 'pedido-1025',
-        numeroPedido: 1025,
-        clienteNome: 'Mariana Souza',
-        clienteTelefone: '11999887766',
-        endereco: 'Av. Paulista, 1500',
-        bairro: 'Bela Vista',
-        complemento: 'Sala 804 (Recepção)',
-        itens: [
-          { nome: 'Smash Burger Duplo 4Zero5', quantidade: 2, preco: 34.9, adicionais: ['+ Queijo Prato Derretido'] },
-          { nome: 'Suco Natural de Laranja', quantidade: 2, preco: 8.5 },
-        ],
-        total: 86.8,
-        formaPagamento: 'Pix Instantâneo (Já Pago)',
-        observacoes: 'Por favor, não colocar cebola em um dos burgers.',
-        status: 'preparando',
-        criadoEm: new Date(Date.now() - 8 * 60000).toISOString(),
-      },
-    ];
+    return [];
   });
 
   // Mesas do salão físico
@@ -150,7 +114,15 @@ export const PainelGeral: React.FC<PainelGeralProps> = ({
       const salvos = localStorage.getItem('domgabriel_mesas_salao');
       if (salvos) {
         const parsed = JSON.parse(salvos);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Filtra mesas que tinham clientes fictícios antigos
+          return parsed.map((m: MesaItem) => {
+            if (m.cliente === 'Lucas & Amigos' || m.cliente === 'Família Silva' || m.cliente === 'Camila Santos') {
+              return { ...m, status: 'livre', cliente: undefined, garcom: undefined, itens: [], abertaEm: undefined };
+            }
+            return m;
+          });
+        }
       }
     } catch {}
     return MESAS_INICIAIS;

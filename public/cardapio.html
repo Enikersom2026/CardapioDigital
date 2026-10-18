@@ -33,7 +33,7 @@
     <div class="max-w-4xl mx-auto flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 text-center sm:text-left">
       <div class="flex items-center gap-4">
         <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-amber-600 to-[#ff4b2b] p-1 flex items-center justify-center shadow-[0_0_20px_rgba(255,75,43,0.3)]">
-          <img src="/src/assets/images/emblema_dom_gabriel.png" onerror="this.src='https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&fit=crop'" alt="Dom Gabriel Logo" class="w-full h-full object-cover rounded-xl">
+          <img src="/emblema_dom_gabriel.png" onerror="this.src='/assets/images/emblema_dom_gabriel.png'; this.onerror=function(){this.src='emblema_dom_gabriel.png';}" alt="Dom Gabriel Logo" class="w-full h-full object-cover rounded-xl">
         </div>
         <div>
           <h1 class="text-xl sm:text-2xl font-black text-white tracking-wide">Dom Gabriel Hamburgueria</h1>
@@ -142,7 +142,7 @@
 
       <!-- Resumo do Prato -->
       <div class="flex items-center gap-3 p-3 bg-zinc-950 rounded-xl border border-zinc-800/80 mb-4">
-        <img id="modalAdicionaisImg" src="/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg" alt="Hambúrguer" class="w-16 h-16 rounded-lg object-cover border border-zinc-800">
+        <img id="modalAdicionaisImg" src="/assets/images/dish_xbacon_artesanal_1791212532576.jpg" alt="Hambúrguer" class="w-16 h-16 rounded-lg object-cover border border-zinc-800">
         <div class="flex-1 min-w-0">
           <h4 id="modalAdicionaisNomePrato" class="text-sm font-extrabold text-white truncate">Nome do Prato</h4>
           <p id="modalAdicionaisDesc" class="text-xs text-zinc-400 line-clamp-2 mt-0.5">Descrição dos ingredientes</p>
@@ -328,7 +328,7 @@ const ITENS_PADRAO = [
     preco: 36.90,
     categoria: 'Hambúrgueres',
     descricao: 'Blend bovino 160g no fogo, fatias generosas de bacon artesanal crocante defumado, queijo prato derretido e maionese secreta da casa.',
-    foto: '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg',
+    foto: '/assets/images/dish_xbacon_artesanal_1791212532576.jpg',
     adicionais: [...ADICIONAIS_PADRAO]
   },
   {
@@ -337,7 +337,7 @@ const ITENS_PADRAO = [
     preco: 34.90,
     categoria: 'Hambúrgueres',
     descricao: '2x Smash burgers de 80g com crostinha crocante, cascata dupla de cheddar inglês derretido e cebola caramelizada.',
-    foto: '/src/assets/images/hero_burger_craft_1791212520486.jpg',
+    foto: '/assets/images/hero_burger_craft_1791212520486.jpg',
     adicionais: [
       { nome: 'Smash Extra 80g', preco: 9.00 },
       { nome: 'Cascata de Cheddar Melt', preco: 5.50 },
@@ -352,7 +352,7 @@ const ITENS_PADRAO = [
     preco: 49.90,
     categoria: 'Combos',
     descricao: '1 Burger Artesanal da casa, porção individual de batata rústica crocante com alecrim e 1 refrigerante lata trincando.',
-    foto: '/src/assets/images/hero_burger_craft_1791212520486.jpg',
+    foto: '/assets/images/hero_burger_craft_1791212520486.jpg',
     adicionais: [...ADICIONAIS_PADRAO]
   },
   {
@@ -361,7 +361,7 @@ const ITENS_PADRAO = [
     preco: 24.90,
     categoria: 'Porções',
     descricao: 'Batatas rústicas cortadas à mão, fritas no ponto perfeito, temperadas com sal marinho, alecrim fresco e farofa de bacon.',
-    foto: '/src/assets/images/dish_batata_rustica_1791212543257.jpg',
+    foto: '/assets/images/dish_batata_rustica_1791212543257.jpg',
     adicionais: [
       { nome: 'Farofa Extra de Bacon', preco: 4.50 },
       { nome: 'Cheddar Cremoso por Cima', preco: 5.00 },
@@ -374,7 +374,7 @@ const ITENS_PADRAO = [
     preco: 14.90,
     categoria: 'Bebidas & Drinks',
     descricao: 'Xarope artesanal francês de maçã verde, água gaseificada premium, muito gelo e lâminas de limão siciliano.',
-    foto: '/src/assets/images/dish_artisan_drink_1791212555004.jpg',
+    foto: '/assets/images/dish_artisan_drink_1791212555004.jpg',
     adicionais: []
   },
   {
@@ -383,7 +383,7 @@ const ITENS_PADRAO = [
     preco: 7.00,
     categoria: 'Bebidas & Drinks',
     descricao: 'Original ou Zero Açúcar bem gelada.',
-    foto: '/src/assets/images/dish_artisan_drink_1791212555004.jpg',
+    foto: '/assets/images/dish_artisan_drink_1791212555004.jpg',
     adicionais: []
   }
 ];
@@ -415,7 +415,7 @@ try {
         preco: Number(p.price) || 0,
         categoria: p.category,
         descricao: p.gourmetDescription || p.shortDescription || p.ingredients || '',
-        foto: p.image || '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg',
+        foto: p.image || '/assets/images/dish_xbacon_artesanal_1791212532576.jpg',
         adicionais: prepararAdicionais(p.adicionais, p.category)
       }));
     }
@@ -430,7 +430,7 @@ try {
           preco: parseFloat(p.preco) || 0,
           categoria: p.categoria || 'Hambúrgueres',
           descricao: p.descricao || '',
-          foto: '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg',
+          foto: '/assets/images/dish_xbacon_artesanal_1791212532576.jpg',
           adicionais: prepararAdicionais(p.adicionais, p.categoria || 'Hambúrgueres')
         }));
       }

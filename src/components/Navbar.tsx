@@ -68,7 +68,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="w-11 h-11 rounded-xl bg-black border border-cyan-400/50 text-white flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.3)] overflow-hidden p-0.5 hover:scale-105 transition-all cursor-pointer"
             >
               <img
-                src="/src/assets/images/emblema_dom_gabriel.png"
+                src="/emblema_dom_gabriel.png"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.includes('/assets/images/emblema_dom_gabriel.png')) {
+                    target.src = '/assets/images/emblema_dom_gabriel.png';
+                  }
+                }}
                 alt="Hamburgueria Dom Gabriel"
                 className="w-full h-full object-contain"
               />

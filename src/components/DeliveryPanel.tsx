@@ -46,56 +46,8 @@ interface DeliveryPanelProps {
   onVoltarPainel?: () => void;
 }
 
-// Pedidos Iniciais de Demonstração (incluindo o Pedido #1024 do snippet do usuário)
-const PEDIDOS_DEMO_INICIAIS: DeliveryOrder[] = [
-  {
-    id: 'pedido-1024',
-    numeroPedido: 1024,
-    clienteNome: 'João Silva',
-    clienteTelefone: '11987654321',
-    endereco: 'Rua das Flores, 123',
-    bairro: 'Centro',
-    complemento: 'Apt 42 - Bloco B',
-    itens: [
-      {
-        nome: 'X-Bacon Artesanal',
-        quantidade: 1,
-        preco: 32.9,
-        adicionais: ['+ Bacon Crocante Extra', '+ Cheddar Cremoso'],
-      },
-      { nome: 'Batatas Rústicas com Alecrim', quantidade: 1, preco: 18.0 },
-      { nome: 'Coca-Cola Zero 350ml', quantidade: 1, preco: 6.5 },
-    ],
-    total: 57.4,
-    formaPagamento: 'Cartão na Entrega',
-    observacoes: 'Tocar o interfone 42, deixar na portaria se demorar.',
-    status: 'pendente',
-    criadoEm: new Date(Date.now() - 15 * 60000).toISOString(),
-  },
-  {
-    id: 'pedido-1025',
-    numeroPedido: 1025,
-    clienteNome: 'Mariana Souza',
-    clienteTelefone: '11999887766',
-    endereco: 'Av. Paulista, 1500',
-    bairro: 'Bela Vista',
-    complemento: 'Sala 804 (Recepção)',
-    itens: [
-      {
-        nome: 'Smash Burger Duplo 4Zero5',
-        quantidade: 2,
-        preco: 34.9,
-        adicionais: ['+ Queijo Prato Derretido'],
-      },
-      { nome: 'Suco Natural de Laranja', quantidade: 2, preco: 8.5 },
-    ],
-    total: 86.8,
-    formaPagamento: 'Pix Instantâneo (Já Pago)',
-    observacoes: 'Por favor, não colocar cebola em um dos burgers.',
-    status: 'preparando',
-    criadoEm: new Date(Date.now() - 8 * 60000).toISOString(),
-  },
-];
+// Pedidos Iniciais: VAZIO para início válido
+const PEDIDOS_DEMO_INICIAIS: DeliveryOrder[] = [];
 
 export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
   restaurant,
@@ -141,11 +93,13 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
       const salvos = localStorage.getItem('domgabriel_pedidos_entregador');
       if (salvos) {
         const parsed = JSON.parse(salvos);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((p: any) => p && !p.id?.startsWith('pedido-1024') && !p.id?.startsWith('pedido-1025'));
+        }
       }
-      return PEDIDOS_DEMO_INICIAIS;
+      return [];
     } catch {
-      return PEDIDOS_DEMO_INICIAIS;
+      return [];
     }
   });
 
@@ -335,15 +289,6 @@ export const DeliveryPanel: React.FC<DeliveryPanelProps> = ({
               }
             });
             primeiraCargaRef.current = false;
-          } else {
-            // Se o Firestore estiver vazio pela primeira vez, alimenta os demos
-            PEDIDOS_DEMO_INICIAIS.forEach(async (p) => {
-              try {
-                await setDoc(doc(db, 'pedidos', p.id), p);
-              } catch (e) {
-                console.warn('Erro ao popular demo pedidos no Firestore:', e);
-              }
-            });
           }
         },
         (error) => {

@@ -44,7 +44,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
           <div className="absolute inset-0 bg-cyan-500/25 rounded-full blur-[50px] animate-pulse" />
           
           <img
-            src="/src/assets/images/emblema_dom_gabriel_1791214262759.jpg"
+            src="/emblema_dom_gabriel.png"
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.src.includes('/assets/images/emblema_dom_gabriel_1791214262759.jpg')) {
+                target.src = '/assets/images/emblema_dom_gabriel_1791214262759.jpg';
+              }
+            }}
             alt="Emblema 3D da Hamburgueria Dom Gabriel"
             referrerPolicy="no-referrer"
             className="relative z-10 w-full h-full object-contain filter drop-shadow-[0_0_30px_rgba(34,211,238,0.55)] transition-transform duration-700 hover:scale-105"

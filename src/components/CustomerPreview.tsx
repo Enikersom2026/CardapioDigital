@@ -730,10 +730,10 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
     const fotoPrato =
       prato.image ||
       (['Refrigerantes', 'Sucos', 'Creme', 'Bebidas & Drinks'].includes(prato.category)
-        ? '/src/assets/images/dish_artisan_drink_1791212555004.jpg'
+        ? '/assets/images/dish_artisan_drink_1791212555004.jpg'
         : prato.category === 'Porções'
-        ? '/src/assets/images/dish_batata_rustica_1791212543257.jpg'
-        : '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg');
+        ? '/assets/images/dish_batata_rustica_1791212543257.jpg'
+        : '/assets/images/dish_xbacon_artesanal_1791212532576.jpg');
 
     return (
       <div
@@ -1012,7 +1012,13 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
           <div className="relative shrink-0 flex items-center justify-start">
             <div className="absolute w-24 h-24 sm:w-28 sm:h-28 bg-cyan-500/20 rounded-full blur-[25px] pointer-events-none" />
             <img
-              src="/src/assets/images/emblema_dom_gabriel.png"
+              src="/emblema_dom_gabriel.png"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.src.includes('/assets/images/emblema_dom_gabriel.png')) {
+                  target.src = '/assets/images/emblema_dom_gabriel.png';
+                }
+              }}
               className="relative z-10 w-24 h-24 sm:w-28 sm:h-28 object-contain rounded-full drop-shadow-[0_0_20px_rgba(34,211,238,0.65)] transition-transform hover:scale-105"
               alt="Dom Gabriel Hamburgueria"
             />

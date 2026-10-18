@@ -233,11 +233,11 @@ export const EntregadorPanel: React.FC<EntregadorPanelProps> = ({
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img
-              src="/src/assets/images/entregador_scooter_red_1791801019548.jpg"
+              src="/entregador_scooter_red.jpg"
               onError={(e) => {
                 const target = e.currentTarget;
-                if (!target.src.includes('/entregador_scooter_red.jpg')) {
-                  target.src = '/entregador_scooter_red.jpg';
+                if (!target.src.includes('/assets/images/entregador_scooter_red.jpg')) {
+                  target.src = '/assets/images/entregador_scooter_red.jpg';
                 }
               }}
               referrerPolicy="no-referrer"

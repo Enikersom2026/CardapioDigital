@@ -171,10 +171,10 @@ export const DishGenerator: React.FC<DishGeneratorProps> = ({
       chefTip: result.chefTip,
       image: prefillData?.image || (
         categoria === 'Porções'
-          ? '/src/assets/images/dish_batata_rustica_1791212543257.jpg'
+          ? '/assets/images/dish_batata_rustica_1791212543257.jpg'
           : ['Refrigerantes', 'Sucos', 'Creme', 'Bebidas & Drinks'].includes(categoria)
-          ? '/src/assets/images/dish_artisan_drink_1791212555004.jpg'
-          : '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg'
+          ? '/assets/images/dish_artisan_drink_1791212555004.jpg'
+          : '/assets/images/dish_xbacon_artesanal_1791212532576.jpg'
       ),
       available: true,
       createdAt: new Date().toISOString(),

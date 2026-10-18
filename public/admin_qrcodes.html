@@ -42,8 +42,8 @@
     <div class="painel-config">
         <div class="config-grid">
             <div class="config-col-link">
-                <label>Link do seu Cardápio (URL do Firebase Hosting / Web App):</label>
-                <input type="text" id="linkApp" value="" oninput="gerarTagsMesa()" placeholder="https://web.app/cardapio.html">
+                <label>Link do seu Cardápio (URL do Servidor):</label>
+                <input type="text" id="linkApp" value="https://netlify.app" oninput="gerarTagsMesa()" placeholder="https://netlify.app">
             </div>
             <div class="config-col-qtd">
                 <label>Quantidade de Mesas:</label>
@@ -64,7 +64,7 @@
         const container = document.getElementById('wrapperTags');
         let urlBase = document.getElementById('linkApp').value.trim();
         if (!urlBase) {
-            urlBase = `${window.location.origin}/cardapio.html`;
+            urlBase = 'https://netlify.app';
         }
         const totalMesas = parseInt(document.getElementById('qtdMesasInput').value) || parseInt(localStorage.getItem('totalMesasLayout')) || 15;
         container.innerHTML = '';
@@ -104,7 +104,7 @@
     document.addEventListener("DOMContentLoaded", () => {
         const inputUrl = document.getElementById('linkApp');
         if (inputUrl && !inputUrl.value) {
-            inputUrl.value = `${window.location.origin}/cardapio.html`;
+            inputUrl.value = 'https://netlify.app';
         }
         const inputQtd = document.getElementById('qtdMesasInput');
         const mesasSalvas = parseInt(localStorage.getItem('totalMesasLayout')) || 15;
