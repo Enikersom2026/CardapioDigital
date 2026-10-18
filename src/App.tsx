@@ -42,7 +42,7 @@ export default function App() {
     return 'splash';
   });
   const [userRole, setUserRole] = useState<'admin' | 'customer' | 'entregador'>('admin');
-  const [userIdentifier, setUserIdentifier] = useState('studio4zero5hamburgueria@gmail.com');
+  const [userIdentifier, setUserIdentifier] = useState('domgabriel_hamburgueria@gmail.com');
   const [painelSubTab, setPainelSubTab] = useState<'dashboard' | 'vendas' | 'financeiro' | 'estoque'>('dashboard');
   const [logisticaSubTab, setLogisticaSubTab] = useState<LogisticaSubTab>('despacho');
   const [comandaCaixaId, setComandaCaixaId] = useState<string | undefined>(undefined);

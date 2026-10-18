@@ -1,19 +1,9 @@
 import React, { useState } from 'react';
 import {
-  ChefHat,
-  ShoppingBag,
-  ArrowRight,
-  ShieldCheck,
-  Lock,
-  Mail,
-  User,
   RefreshCw,
   CheckCircle2,
   AlertCircle,
   Truck,
-  Phone,
-  CreditCard,
-  Key,
 } from 'lucide-react';
 import {
   auth,
@@ -158,7 +148,68 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           }
         }
       } else {
-        // Login com e-mail e senha
+        // 🔐 CREDENCIAIS OFICIAIS DO PROPRIETÁRIO DOM GABRIEL
+        const emailLimpo = email.trim().toLowerCase();
+        const isContaProprietario = emailLimpo === 'domgabriel_hamburgueria@gmail.com';
+
+        if (isContaProprietario) {
+          if (password !== '124090') {
+            setMessage({
+              type: 'error',
+              text: 'E-mail ou senha incorretos.',
+            });
+            setLoading(false);
+            return;
+          }
+
+          // Sincroniza conta no Firebase Auth / Firestore se conectado
+          try {
+            await signInWithEmailAndPassword(auth, 'domgabriel_hamburgueria@gmail.com', '124090');
+          } catch (fbErr: any) {
+            if (
+              fbErr.code === 'auth/user-not-found' ||
+              fbErr.code === 'auth/invalid-credential'
+            ) {
+              try {
+                const novoAdmin = await createUserWithEmailAndPassword(
+                  auth,
+                  'domgabriel_hamburgueria@gmail.com',
+                  '124090'
+                );
+                await setDoc(doc(db, 'usuarios', novoAdmin.user.uid), {
+                  email: 'domgabriel_hamburgueria@gmail.com',
+                  perfil: 'admin',
+                  nome: 'Proprietário Dom Gabriel',
+                  criadoEm: new Date().toISOString(),
+                });
+              } catch (createErr) {
+                console.log('Firebase user provision note:', createErr);
+              }
+            }
+          }
+
+          localStorage.setItem(
+            'sabor_digital_current_user',
+            JSON.stringify({
+              uid: 'proprietario-domgabriel',
+              email: 'domgabriel_hamburgueria@gmail.com',
+              role: 'admin',
+              nome: 'Proprietário Dom Gabriel',
+            })
+          );
+
+          setMessage({
+            type: 'success',
+            text: 'Acesso do Proprietário autenticado! Entrando no Centro de Comando...',
+          });
+
+          setTimeout(() => {
+            onLogin('admin', 'domgabriel_hamburgueria@gmail.com');
+          }, 500);
+          return;
+        }
+
+        // Login com e-mail e senha para outros perfis
         try {
           const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
           const user = userCredential.user;
@@ -382,13 +433,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (role: 'admin' | 'customer' | 'entregador') => {
-    let quickEmail = 'cliente@domgabriel.com';
-    if (role === 'admin') quickEmail = defaultEmail || 'admin@domgabriel.com';
-    if (role === 'entregador') quickEmail = 'motoboy@domgabriel.com';
-    onLogin(role, quickEmail);
   };
 
   return (
@@ -730,41 +774,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </form>
         )}
 
-        {/* Atalhos Rápidos para Demonstração */}
-        <div className="mt-6 pt-5 border-t border-[#29292e]">
-          <span className="text-[11px] font-mono text-[#8d8d99] uppercase tracking-wider block mb-2.5 text-center">
-            Acesso Rápido em 1 Clique (Demonstração):
-          </span>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('customer')}
-              className="p-2 bg-[#202024] hover:bg-[#28282e] border border-[#29292e] hover:border-[#ff4b2b]/50 text-white rounded-lg text-[11px] font-semibold flex flex-col items-center gap-1 transition-all cursor-pointer"
-            >
-              <ShoppingBag className="w-4 h-4 text-[#ff4b2b]" />
-              <span>Cliente</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('entregador')}
-              className="p-2 bg-[#202024] hover:bg-[#28282e] border border-[#29292e] hover:border-emerald-500/50 text-white rounded-lg text-[11px] font-semibold flex flex-col items-center gap-1 transition-all cursor-pointer"
-            >
-              <Truck className="w-4 h-4 text-emerald-400" />
-              <span>Entregador</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('admin')}
-              className="p-2 bg-[#202024] hover:bg-[#28282e] border border-[#29292e] hover:border-amber-500/50 text-white rounded-lg text-[11px] font-semibold flex flex-col items-center gap-1 transition-all cursor-pointer"
-            >
-              <ChefHat className="w-4 h-4 text-amber-400" />
-              <span>Admin</span>
-            </button>
-          </div>
-        </div>
-
         {/* Rodapé da Autenticação */}
-        <div className="mt-4 pt-3 border-t border-[#29292e]/60 text-center text-[11px] text-[#8d8d99]">
+        <div className="mt-6 pt-4 border-t border-[#29292e]/60 text-center text-[11px] text-[#8d8d99]">
           <span>Sistema Integrado Dom Gabriel Delivery • Gestão em Tempo Real</span>
         </div>
       </div>
