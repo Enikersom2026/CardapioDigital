@@ -35,13 +35,21 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'splash' | 'auth' | 'app'>(() => {
     try {
       const searchParams = new URLSearchParams(window.location.search);
+      // Se escaneou QR Code de mesa (ex: ?mesa=5) ou link do cardápio, abre direto sem splash e sem login
+      if (searchParams.get('mesa') || searchParams.get('cardapio')) return 'app';
       if (searchParams.get('screen') === 'auth') return 'auth';
       if (searchParams.get('tab')) return 'app';
       if (window.location.hash) return 'app';
     } catch {}
     return 'splash';
   });
-  const [userRole, setUserRole] = useState<'admin' | 'customer' | 'entregador'>('admin');
+  const [userRole, setUserRole] = useState<'admin' | 'customer' | 'entregador'>(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get('mesa') || searchParams.get('cardapio')) return 'customer';
+    } catch {}
+    return 'admin';
+  });
   const [userIdentifier, setUserIdentifier] = useState('domgabriel_hamburgueria@gmail.com');
   const [painelSubTab, setPainelSubTab] = useState<'dashboard' | 'vendas' | 'financeiro' | 'estoque'>('dashboard');
   const [logisticaSubTab, setLogisticaSubTab] = useState<LogisticaSubTab>('despacho');
@@ -126,6 +134,22 @@ export default function App() {
     }
   });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Sincroniza estado de mesa quando acessado via link/QR Code de mesa
+  useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const mesa = searchParams.get('mesa');
+      if (mesa) {
+        localStorage.setItem('mesaAtivaQrCode', mesa);
+        localStorage.setItem('numeroMesaFixoDoQrCode', mesa);
+        localStorage.setItem('modoPedido', 'mesa');
+        setCurrentScreen('app');
+        setUserRole('customer');
+        setActiveTab('preview');
+      }
+    } catch {}
+  }, []);
 
   const handleToggleSidebarCollapse = () => {
     setSidebarCollapsed((prev) => {

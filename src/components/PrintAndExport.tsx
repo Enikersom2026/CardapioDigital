@@ -18,7 +18,15 @@ export const PrintAndExport: React.FC<PrintAndExportProps> = ({ restaurant }) =>
   });
 
   const [urlBase, setUrlBase] = useState<string>(() => {
-    return 'https://netlify.app';
+    try {
+      const saved = localStorage.getItem('urlCardapioQrCode');
+      if (saved && saved !== 'https://netlify.app' && saved !== 'https://netlify.app/') return saved;
+      const origin = window.location.origin;
+      if (origin && origin !== 'null') {
+        return `${origin}/cardapio`;
+      }
+    } catch {}
+    return 'https://domgabriel.netlify.app/cardapio';
   });
 
   const [qrImgs, setQrImgs] = useState<Record<number, string>>({});
@@ -31,7 +39,10 @@ export const PrintAndExport: React.FC<PrintAndExportProps> = ({ restaurant }) =>
 
     const gerar = async () => {
       const urls: Record<number, string> = {};
-      const baseLimpa = urlBase.trim() || `${window.location.origin}/cardapio.html`;
+      let baseLimpa = urlBase.trim();
+      if (!baseLimpa || baseLimpa === 'https://netlify.app' || baseLimpa === 'https://netlify.app/') {
+        baseLimpa = `${window.location.origin}/cardapio`;
+      }
       const sep = baseLimpa.includes('?') ? '&' : '?';
 
       for (let i = 1; i <= totalMesas; i++) {
@@ -138,17 +149,38 @@ export const PrintAndExport: React.FC<PrintAndExportProps> = ({ restaurant }) =>
           {/* Input da URL do Cardápio */}
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-              Link do seu Cardápio (URL do Servidor):
+              Link do seu Cardápio (URL do Servidor / Netlify):
             </label>
             <input
               type="text"
               value={urlBase}
-              onChange={(e) => setUrlBase(e.target.value)}
-              placeholder="https://netlify.app"
+              onChange={(e) => {
+                const val = e.target.value;
+                setUrlBase(val);
+                try {
+                  localStorage.setItem('urlCardapioQrCode', val.trim());
+                } catch {}
+              }}
+              placeholder="https://seu-restaurante.netlify.app/cardapio"
               className="w-full px-4 py-2.5 border border-[#29292e] bg-[#202024] text-white rounded-xl text-xs font-mono focus:outline-hidden focus:border-[#ff4b2b] transition-colors"
             />
-            <span className="text-[11px] text-zinc-500 mt-1 block">
-              Cada QR Code adicionará automaticamente <code className="text-cyan-400">?mesa=X</code> ao final para abrir o pedido direto na mesa correspondente.
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const val = `${window.location.origin}/cardapio`;
+                  setUrlBase(val);
+                  try {
+                    localStorage.setItem('urlCardapioQrCode', val);
+                  } catch {}
+                }}
+                className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2.5 py-1 rounded-lg hover:bg-emerald-900/80 cursor-pointer transition-colors"
+              >
+                ⚡ Usar URL deste site ({typeof window !== 'undefined' ? window.location.origin : ''})
+              </button>
+            </div>
+            <span className="text-[11px] text-zinc-400 mt-1.5 block">
+              💡 Cada QR Code adicionará automaticamente <code className="text-cyan-400">?mesa=X</code> ao final para abrir o cardápio da mesa diretamente sem telas intermediárias.
             </span>
           </div>
 
