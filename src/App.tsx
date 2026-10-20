@@ -58,8 +58,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>(() => {
     try {
       const searchParams = new URLSearchParams(window.location.search);
-      // Se escaneou QR Code de mesa (ex: ?mesa=5), abre direto no Cardápio da Mesa
-      if (searchParams.get('mesa')) {
+      // Se escaneou QR Code de mesa (ex: ?mesa=5) ou cardápio, abre direto no Cardápio da Mesa
+      if (searchParams.get('mesa') || searchParams.get('cardapio')) {
         return 'preview';
       }
       const tabParam = searchParams.get('tab') as AppTab | null;
@@ -140,10 +140,13 @@ export default function App() {
     try {
       const searchParams = new URLSearchParams(window.location.search);
       const mesa = searchParams.get('mesa');
-      if (mesa) {
-        localStorage.setItem('mesaAtivaQrCode', mesa);
-        localStorage.setItem('numeroMesaFixoDoQrCode', mesa);
-        localStorage.setItem('modoPedido', 'mesa');
+      const cardapio = searchParams.get('cardapio');
+      if (mesa || cardapio) {
+        if (mesa) {
+          localStorage.setItem('mesaAtivaQrCode', mesa);
+          localStorage.setItem('numeroMesaFixoDoQrCode', mesa);
+          localStorage.setItem('modoPedido', 'mesa');
+        }
         setCurrentScreen('app');
         setUserRole('customer');
         setActiveTab('preview');
