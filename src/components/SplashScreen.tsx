@@ -8,9 +8,10 @@ interface SplashScreenProps {
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({
   onFinish,
-  durationSeconds = 4,
+  durationSeconds = 5,
 }) => {
   const [progress, setProgress] = useState(0);
+  const [videoAtivo, setVideoAtivo] = useState(true);
 
   useEffect(() => {
     const startTime = Date.now();
@@ -31,7 +32,27 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   }, [durationSeconds, onFinish]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-center items-center bg-black text-white select-none px-4 relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col justify-center items-center bg-[#0f0f12] text-white select-none px-4 relative overflow-hidden">
+      {/* Vídeo em Tela Cheia TikTok/Reels caso animacao_abertura.mp4 esteja presente */}
+      {videoAtivo && (
+        <video
+          id="videoAnimacao"
+          playsInline
+          autoPlay
+          muted
+          disablePictureInPicture
+          onEnded={onFinish}
+          onError={() => setVideoAtivo(false)}
+          className="absolute inset-0 w-full h-full object-cover z-30 pointer-events-none"
+        >
+          <source src="/video/vídeo.mp4" type="video/mp4" />
+          <source src="/video/video.mp4" type="video/mp4" />
+          <source src="/video/animacao_abertura.mp4" type="video/mp4" />
+          <source src="/video.mp4" type="video/mp4" />
+          <source src="/animacao_abertura.mp4" type="video/mp4" />
+        </video>
+      )}
+
       {/* Background Neon Cyan Radial Glow Spotlight */}
       <div className="absolute w-[650px] h-[650px] bg-cyan-500/12 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-40" />

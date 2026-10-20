@@ -581,6 +581,9 @@ async function startServer() {
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   const isProd = process.env.NODE_ENV === 'production';
 
+  // Servir arquivos estáticos da pasta public (vídeos, imagens, htmls)
+  app.use(express.static(path.resolve(__dirname, 'public')));
+
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

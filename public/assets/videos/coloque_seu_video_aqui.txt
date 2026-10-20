@@ -1,0 +1,5 @@
+Cole o seu arquivo de vídeo aqui com o nome:
+animacao_abertura.mp4
+
+Formatos aceitos: MP4 (H.264), WebM
+A splash screen e a tela de abertura carregarão este vídeo automaticamente.

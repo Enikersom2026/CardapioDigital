@@ -18,12 +18,7 @@ export const PrintAndExport: React.FC<PrintAndExportProps> = ({ restaurant }) =>
   });
 
   const [urlBase, setUrlBase] = useState<string>(() => {
-    try {
-      const origin = window.location.origin;
-      return origin && !origin.includes('localhost') ? `${origin}/cardapio.html` : 'https://netlify.app';
-    } catch {
-      return 'https://netlify.app';
-    }
+    return 'https://netlify.app';
   });
 
   const [qrImgs, setQrImgs] = useState<Record<number, string>>({});

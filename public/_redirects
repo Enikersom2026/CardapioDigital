@@ -25,6 +25,8 @@
 /cadastro               /admin_cadastro.html        200
 /admin_qrcodes          /admin_qrcodes.html         200
 /qrcodes                /admin_qrcodes.html         200
+/splash                 /splash.html                200
+/splash.html            /splash.html                200
 
 # Redirecionamentos para as abas do app principal React
 /entregador.html        /?tab=entregador            302
