@@ -425,10 +425,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     } else {
       const defaultImage =
         categoria === 'Porções'
-          ? '/src/assets/images/dish_batata_rustica_1791212543257.jpg'
+          ? '/assets/images/dish_batata_rustica_1791212543257.jpg'
           : ['Refrigerantes', 'Sucos', 'Creme', 'Bebidas & Drinks'].includes(categoria)
-          ? '/src/assets/images/dish_artisan_drink_1791212555004.jpg'
-          : '/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg';
+          ? '/assets/images/dish_artisan_drink_1791212555004.jpg'
+          : '/assets/images/dish_xbacon_artesanal_1791212532576.jpg';
 
       const novoPrato: MenuItem = {
         id: `item-${Date.now()}`,
@@ -1117,13 +1117,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            setFotoProduto('/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg');
+                            setFotoProduto('/assets/images/dish_xbacon_artesanal_1791212532576.jpg');
                             setStatusLinkImg({ tipo: 'ok', msg: '✓ Foto de Burger selecionada!' });
                           }}
                           className="p-1 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-cyan-500/60 transition-all flex flex-col items-center gap-1 group cursor-pointer text-left"
                         >
                           <img
-                            src="/src/assets/images/dish_xbacon_artesanal_1791212532576.jpg"
+                            src="/assets/images/dish_xbacon_artesanal_1791212532576.jpg"
                             alt="Burger Artesanal"
                             className="w-full h-10 object-cover rounded-md group-hover:scale-105 transition-transform"
                           />
@@ -1135,13 +1135,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            setFotoProduto('/src/assets/images/dish_batata_rustica_1791212543257.jpg');
+                            setFotoProduto('/assets/images/dish_batata_rustica_1791212543257.jpg');
                             setStatusLinkImg({ tipo: 'ok', msg: '✓ Foto de Porção selecionada!' });
                           }}
                           className="p-1 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-cyan-500/60 transition-all flex flex-col items-center gap-1 group cursor-pointer text-left"
                         >
                           <img
-                            src="/src/assets/images/dish_batata_rustica_1791212543257.jpg"
+                            src="/assets/images/dish_batata_rustica_1791212543257.jpg"
                             alt="Batatas Rústicas"
                             className="w-full h-10 object-cover rounded-md group-hover:scale-105 transition-transform"
                           />
@@ -1153,13 +1153,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            setFotoProduto('/src/assets/images/dish_artisan_drink_1791212555004.jpg');
+                            setFotoProduto('/assets/images/dish_artisan_drink_1791212555004.jpg');
                             setStatusLinkImg({ tipo: 'ok', msg: '✓ Foto de Bebida selecionada!' });
                           }}
                           className="p-1 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-cyan-500/60 transition-all flex flex-col items-center gap-1 group cursor-pointer text-left"
                         >
                           <img
-                            src="/src/assets/images/dish_artisan_drink_1791212555004.jpg"
+                            src="/assets/images/dish_artisan_drink_1791212555004.jpg"
                             alt="Refrigerantes / Sucos"
                             className="w-full h-10 object-cover rounded-md group-hover:scale-105 transition-transform"
                           />
