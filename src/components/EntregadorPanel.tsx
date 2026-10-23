@@ -13,8 +13,27 @@ import {
   DollarSign,
   AlertCircle,
   Package,
+  Trash2,
+  AlertTriangle,
+  X,
+  UserX,
+  ShieldAlert,
 } from 'lucide-react';
-import { db, doc, updateDoc, onSnapshot, collection, setDoc } from '../services/firebase';
+import {
+  auth,
+  db,
+  doc,
+  updateDoc,
+  onSnapshot,
+  collection,
+  setDoc,
+  deleteDoc,
+  deleteUser,
+  signOut,
+  getDocs,
+  query,
+  where,
+} from '../services/firebase';
 import { DeliveryOrder, RestaurantConfig } from '../types';
 
 interface EntregadorPanelProps {
@@ -48,7 +67,127 @@ export const EntregadorPanel: React.FC<EntregadorPanelProps> = ({
   } | null>(null);
   const [filtroAba, setFiltroAba] = useState<'disponiveis' | 'historico'>('disponiveis');
 
+  // Estados para o Modal de Exclusão de Conta do Entregador
+  const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
+  const [confirmacaoTexto, setConfirmacaoTexto] = useState('');
+  const [excluindoConta, setExcluindoConta] = useState(false);
+  const [erroExclusao, setErroExclusao] = useState<string | null>(null);
+
   const idGpsWatcherRef = useRef<number | null>(null);
+
+  // Ação de Exclusão Definitiva da Conta de Entregador
+  const handleExcluirConta = async () => {
+    if (confirmacaoTexto.trim().toUpperCase() !== 'EXCLUIR') {
+      setErroExclusao('Por favor, digite a palavra EXCLUIR para confirmar a exclusão da sua conta.');
+      return;
+    }
+
+    setExcluindoConta(true);
+    setErroExclusao(null);
+
+    try {
+      // 1. Identificar UID e Email da sessão
+      let uid = auth.currentUser?.uid;
+      let email = userEmail || auth.currentUser?.email;
+
+      try {
+        const localUser = localStorage.getItem('sabor_digital_current_user');
+        if (localUser) {
+          const parsed = JSON.parse(localUser);
+          if (!uid && parsed.uid) uid = parsed.uid;
+          if (!email && parsed.email) email = parsed.email;
+        }
+      } catch {}
+
+      // 2. Remover documentos do Firestore em 'entregadores' e 'usuarios'
+      if (uid) {
+        try {
+          await deleteDoc(doc(db, 'entregadores', uid));
+        } catch (e) {
+          console.warn('Erro ao deletar doc entregadores por UID:', e);
+        }
+        try {
+          await deleteDoc(doc(db, 'usuarios', uid));
+        } catch (e) {
+          console.warn('Erro ao deletar doc usuarios por UID:', e);
+        }
+      }
+
+      // Se tiver email, busca e remove documentos associados pelo email caso o UID seja diferente
+      if (email) {
+        try {
+          const qEntregadores = query(collection(db, 'entregadores'), where('email', '==', email.trim()));
+          const snapEntregadores = await getDocs(qEntregadores);
+          snapEntregadores.forEach(async (d) => {
+            await deleteDoc(doc(db, 'entregadores', d.id));
+          });
+        } catch (e) {
+          console.warn('Erro ao buscar/deletar entregador por email:', e);
+        }
+
+        try {
+          const qUsuarios = query(collection(db, 'usuarios'), where('email', '==', email.trim()));
+          const snapUsuarios = await getDocs(qUsuarios);
+          snapUsuarios.forEach(async (d) => {
+            await deleteDoc(doc(db, 'usuarios', d.id));
+          });
+        } catch (e) {
+          console.warn('Erro ao buscar/deletar usuario por email:', e);
+        }
+      }
+
+      // 3. Remover entregador da lista ativa de motoboys local
+      try {
+        const motoboysStr = localStorage.getItem('domgabriel_motoboys_ativos');
+        if (motoboysStr) {
+          const lista = JSON.parse(motoboysStr);
+          if (Array.isArray(lista)) {
+            const filtrada = lista.filter((m: any) => m.email !== email && m.id !== uid);
+            localStorage.setItem('domgabriel_motoboys_ativos', JSON.stringify(filtrada));
+          }
+        }
+      } catch {}
+
+      // 4. Parar transmissão de GPS se estiver ativa
+      if (idGpsWatcherRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.clearWatch(idGpsWatcherRef.current);
+        idGpsWatcherRef.current = null;
+      }
+
+      // 5. Limpar dados locais da sessão
+      try {
+        localStorage.removeItem('sabor_digital_current_user');
+        localStorage.removeItem('domgabriel_gps_entregador');
+      } catch {}
+
+      // 6. Excluir conta no Firebase Auth
+      if (auth.currentUser) {
+        try {
+          await deleteUser(auth.currentUser);
+        } catch (authErr: any) {
+          console.warn('Erro ao deletar usuario do Firebase Auth (pode requerer reautenticação):', authErr);
+          await signOut(auth);
+        }
+      } else {
+        try {
+          await signOut(auth);
+        } catch {}
+      }
+
+      setModalExcluirAberto(false);
+      alert('✓ Sua conta de entregador foi excluída com sucesso. Todos os seus dados foram apagados da plataforma.');
+
+      if (onLogout) {
+        onLogout();
+      } else {
+        window.location.href = '/?screen=auth';
+      }
+    } catch (err: any) {
+      console.error('Erro geral ao excluir conta de entregador:', err);
+      setErroExclusao(err?.message || 'Falha ao excluir a conta. Tente novamente.');
+      setExcluindoConta(false);
+    }
+  };
 
   // 1. Escuta em tempo real do Firestore na coleção "pedidos"
   useEffect(() => {
@@ -260,11 +399,26 @@ export const EntregadorPanel: React.FC<EntregadorPanelProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmacaoTexto('');
+                setErroExclusao(null);
+                setModalExcluirAberto(true);
+              }}
+              title="Excluir Minha Conta de Entregador"
+              className="px-2.5 py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-900/50 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+              <span className="hidden sm:inline">Excluir Conta</span>
+            </button>
+
             {onLogout && (
               <button
+                type="button"
                 onClick={onLogout}
                 title="Desconectar do App"
-                className="p-2 rounded-lg bg-[#202024] hover:bg-red-950/50 hover:text-red-400 text-[#8d8d99] border border-[#29292e] transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                className="p-2 rounded-lg bg-[#202024] hover:bg-zinc-800 text-[#8d8d99] hover:text-white border border-[#29292e] transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Sair</span>
@@ -556,12 +710,163 @@ export const EntregadorPanel: React.FC<EntregadorPanelProps> = ({
             )}
           </div>
         )}
+
+        {/* Bloco de Privacidade & Exclusão de Conta */}
+        <div className="mt-8 pt-4 border-t border-[#29292e]">
+          <div className="p-4 rounded-xl bg-[#18181c] border border-red-950/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-red-950/50 border border-red-900/50 flex items-center justify-center shrink-0">
+                <UserX className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-zinc-200">
+                  Gerenciamento de Conta & Privacidade
+                </h4>
+                <p className="text-[11px] text-zinc-400">
+                  Deseja encerrar sua parceria de entregas e excluir seus dados?
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmacaoTexto('');
+                setErroExclusao(null);
+                setModalExcluirAberto(true);
+              }}
+              className="w-full sm:w-auto px-3.5 py-2 rounded-lg bg-red-950/50 hover:bg-red-900/80 text-red-300 hover:text-white border border-red-800/80 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Excluir Minha Conta</span>
+            </button>
+          </div>
+        </div>
       </main>
 
       {/* Rodapé Exclusivo do Entregador */}
       <footer className="bg-[#1a1a1e] border-t border-[#29292e] py-4 px-4 text-center text-xs text-[#8d8d99]">
         <p>🛵 Dom Gabriel Hamburgueria • Painel do Entregador Parceiro</p>
       </footer>
+
+      {/* Modal de Confirmação Segura de Exclusão de Conta */}
+      {modalExcluirAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-[#18181c] border border-red-900/80 rounded-2xl shadow-[0_0_50px_rgba(239,68,68,0.25)] p-5 sm:p-6 overflow-hidden">
+            {/* Faixa decorativa superior */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-red-600 via-orange-500 to-red-600" />
+
+            {/* Cabeçalho do Modal */}
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-950/70 border border-red-600/50 flex items-center justify-center text-red-400 shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">
+                    Excluir Conta de Entregador
+                  </h3>
+                  <p className="text-xs text-red-400 font-medium">
+                    Ação permanente e irreversível
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!excluindoConta) setModalExcluirAberto(false);
+                }}
+                disabled={excluindoConta}
+                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Descrição e Alertas */}
+            <div className="space-y-3 mb-5">
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Ao excluir sua conta, todos os seus dados serão apagados permanentemente dos nossos servidores:
+              </p>
+
+              <div className="p-3 rounded-xl bg-red-950/30 border border-red-900/40 text-[11px] text-zinc-300 space-y-1.5 font-mono">
+                <div className="flex items-center gap-2 text-red-300">
+                  <span>•</span>
+                  <span>Remoção do cadastro de parceiro e login</span>
+                </div>
+                <div className="flex items-center gap-2 text-red-300">
+                  <span>•</span>
+                  <span>Exclusão da Chave PIX e dados bancários</span>
+                </div>
+                <div className="flex items-center gap-2 text-red-300">
+                  <span>•</span>
+                  <span>Desconexão imediata do radar GPS de entregas</span>
+                </div>
+                <div className="flex items-center gap-2 text-red-300">
+                  <span>•</span>
+                  <span>Conta: <strong className="text-white break-all">{userEmail || 'Entregador Atual'}</strong></span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-xs font-semibold text-zinc-200">
+                  Para confirmar, digite <span className="text-red-400 font-black">EXCLUIR</span> no campo abaixo:
+                </label>
+                <input
+                  type="text"
+                  value={confirmacaoTexto}
+                  onChange={(e) => {
+                    setConfirmacaoTexto(e.target.value);
+                    if (erroExclusao) setErroExclusao(null);
+                  }}
+                  disabled={excluindoConta}
+                  placeholder="Digite EXCLUIR"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#121214] border border-[#29292e] focus:border-red-500 text-white font-mono text-sm uppercase placeholder:normal-case placeholder:text-zinc-600 focus:outline-none transition-colors"
+                />
+              </div>
+
+              {erroExclusao && (
+                <div className="p-2.5 rounded-lg bg-red-950/80 border border-red-800 text-xs text-red-200 flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{erroExclusao}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Botões de Ação */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalExcluirAberto(false)}
+                disabled={excluindoConta}
+                className="px-4 py-2.5 rounded-xl bg-[#202024] hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExcluirConta}
+                disabled={excluindoConta || confirmacaoTexto.trim().toUpperCase() !== 'EXCLUIR'}
+                className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:hover:bg-red-600 text-white text-xs font-extrabold shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all cursor-pointer flex items-center gap-2"
+              >
+                {excluindoConta ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Excluindo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Confirmar e Excluir Minha Conta</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

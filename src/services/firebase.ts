@@ -5,6 +5,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  deleteUser,
   User as FirebaseUser,
 } from 'firebase/auth';
 import {
@@ -18,6 +19,8 @@ import {
   addDoc,
   deleteDoc,
   updateDoc,
+  query,
+  where,
 } from 'firebase/firestore';
 
 export const firebaseConfig = {
@@ -38,6 +41,7 @@ export {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  deleteUser,
   onAuthStateChanged,
   collection,
   doc,
@@ -48,5 +52,7 @@ export {
   addDoc,
   deleteDoc,
   updateDoc,
+  query,
+  where,
 };
 export type { FirebaseUser };
