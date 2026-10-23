@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { ArrowRight, Volume2, VolumeX, Play } from 'lucide-react';
 
 interface SplashScreenProps {
   onFinish: () => void;
@@ -8,114 +8,157 @@ interface SplashScreenProps {
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({
   onFinish,
-  durationSeconds = 5,
+  durationSeconds = 8,
 }) => {
-  const [progress, setProgress] = useState(0);
-  const [videoAtivo, setVideoAtivo] = useState(true);
+  const [estaMutado, setEstaMutado] = useState(true);
+  const [bloqueioAutoplay, setBloqueioAutoplay] = useState(false);
+  const [tocando, setTocando] = useState(false);
+  const [encerrando, setEncerrando] = useState(false);
 
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const finalizarComFade = () => {
+    if (encerrando) return;
+    setEncerrando(true);
+    setTimeout(() => {
+      onFinish();
+    }, 450);
+  };
+
+  // Garante a execução do vídeo nas políticas de segurança de Safari/Chrome/Firefox
   useEffect(() => {
-    const startTime = Date.now();
-    const totalMs = durationSeconds * 1000;
+    const vid = videoRef.current;
+    if (!vid) return;
 
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const pct = Math.min(100, Math.round((elapsed / totalMs) * 100));
-      setProgress(pct);
+    // Define propriedades essenciais no DOM para destravar autoplay
+    vid.muted = true;
+    vid.defaultMuted = true;
+    vid.playsInline = true;
 
-      if (elapsed >= totalMs) {
-        clearInterval(interval);
-        onFinish();
+    const tentarTocar = () => {
+      const promessa = vid.play();
+      if (promessa !== undefined) {
+        promessa
+          .then(() => {
+            setTocando(true);
+            setBloqueioAutoplay(false);
+          })
+          .catch((err) => {
+            console.warn('Autoplay bloqueado pelo navegador até o primeiro toque:', err);
+            setBloqueioAutoplay(true);
+          });
       }
-    }, 50);
+    };
 
-    return () => clearInterval(interval);
-  }, [durationSeconds, onFinish]);
+    tentarTocar();
+  }, []);
+
+  // Timer de segurança geral de encerramento
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      finalizarComFade();
+    }, (durationSeconds + 0.5) * 1000);
+
+    return () => clearTimeout(timer);
+  }, [durationSeconds]);
+
+  // Alterna o som do vídeo
+  const alternarSom = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const vid = videoRef.current;
+    if (vid) {
+      vid.muted = !vid.muted;
+      setEstaMutado(vid.muted);
+    }
+  };
+
+  // Clique na tela destrava o vídeo caso o navegador tenha bloqueado autoplay
+  const handleContainerClick = () => {
+    const vid = videoRef.current;
+    if (vid) {
+      if (vid.paused) {
+        vid.muted = estaMutado;
+        vid
+          .play()
+          .then(() => {
+            setTocando(true);
+            setBloqueioAutoplay(false);
+          })
+          .catch(console.warn);
+      }
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-center items-center bg-[#0f0f12] text-white select-none px-4 relative overflow-hidden">
-      {/* Vídeo em Tela Cheia TikTok/Reels caso animacao_abertura.mp4 esteja presente */}
-      {videoAtivo && (
-        <video
-          id="videoAnimacao"
-          playsInline
-          autoPlay
-          muted
-          disablePictureInPicture
-          onEnded={onFinish}
-          onError={() => setVideoAtivo(false)}
-          className="absolute inset-0 w-full h-full object-cover z-30 pointer-events-none"
-        >
-          <source src="/video/vídeo.mp4" type="video/mp4" />
-          <source src="/video/video.mp4" type="video/mp4" />
-          <source src="/video/animacao_abertura.mp4" type="video/mp4" />
-          <source src="/video.mp4" type="video/mp4" />
-          <source src="/animacao_abertura.mp4" type="video/mp4" />
-        </video>
+    <div
+      onClick={handleContainerClick}
+      className={`fixed inset-0 z-50 flex flex-col justify-center items-center bg-black text-white select-none relative overflow-hidden transition-opacity duration-500 ${
+        encerrando ? 'opacity-0 pointer-events-none' : 'opacity-100 cursor-pointer'
+      }`}
+    >
+      {/* 🎬 VÍDEO PRINCIPAL COM POSTER DO FRAME 1 (Elimina qualquer tela preta ou atraso) */}
+      <video
+        ref={videoRef}
+        poster="/poster_abertura.png"
+        playsInline
+        autoPlay
+        muted
+        preload="auto"
+        disablePictureInPicture
+        onPlay={() => {
+          setTocando(true);
+          setBloqueioAutoplay(false);
+        }}
+        onEnded={finalizarComFade}
+        className="absolute inset-0 w-full h-full object-cover z-20 pointer-events-none"
+      >
+        <source src="/video/video.mp4" type="video/mp4" />
+        <source src="/animacao_abertura.mp4" type="video/mp4" />
+        <source src="/video.mp4" type="video/mp4" />
+        <source src="video/video.mp4" type="video/mp4" />
+      </video>
+
+      {/* Camada com Botão de Play Pulsante se o navegador exigir toque para rodar */}
+      {bloqueioAutoplay && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/50 backdrop-blur-xs p-6 text-center animate-fade-in pointer-events-auto">
+          <div className="w-18 h-18 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 text-black flex items-center justify-center mb-4 shadow-[0_0_35px_rgba(245,158,11,0.7)] animate-bounce">
+            <Play className="w-9 h-9 ml-1 fill-black text-black" />
+          </div>
+          <h2 className="text-xl font-black tracking-wide text-white drop-shadow-md mb-1">
+            Toque na tela para iniciar
+          </h2>
+          <p className="text-xs text-amber-300 font-mono tracking-widest uppercase">
+            Dom Gabriel Hamburgueria Artesanal
+          </p>
+        </div>
       )}
 
-      {/* Background Neon Cyan Radial Glow Spotlight */}
-      <div className="absolute w-[650px] h-[650px] bg-cyan-500/12 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-40" />
-      <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-40" />
+      {/* Botões Superiores de Controle (Som e Pular) */}
+      <div className="absolute top-5 right-5 z-40 flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={alternarSom}
+          className="p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 transition-all cursor-pointer backdrop-blur-md shadow-xl"
+          title={estaMutado ? 'Ativar áudio' : 'Mutar áudio'}
+        >
+          {estaMutado ? (
+            <VolumeX className="w-4 h-4 text-zinc-300" />
+          ) : (
+            <Volume2 className="w-4 h-4 text-amber-400" />
+          )}
+        </button>
 
-      {/* Emblema 3D da Hamburgueria Dom Gabriel */}
-      <div className="text-center flex flex-col items-center relative z-10">
-        <div className="relative w-64 h-64 sm:w-80 sm:h-80 mx-auto mb-2 flex items-center justify-center">
-          {/* Cyan Glow Aura behind emblem */}
-          <div className="absolute inset-0 bg-cyan-500/25 rounded-full blur-[50px] animate-pulse" />
-          
-          <img
-            src="/emblema_dom_gabriel.png"
-            onError={(e) => {
-              const target = e.currentTarget;
-              if (!target.src.includes('/assets/images/emblema_dom_gabriel_1791214262759.jpg')) {
-                target.src = '/assets/images/emblema_dom_gabriel_1791214262759.jpg';
-              }
-            }}
-            alt="Emblema 3D da Hamburgueria Dom Gabriel"
-            referrerPolicy="no-referrer"
-            className="relative z-10 w-full h-full object-contain filter drop-shadow-[0_0_30px_rgba(34,211,238,0.55)] transition-transform duration-700 hover:scale-105"
-          />
-        </div>
-
-        {/* Subtitle & Tagline */}
-        <h1 className="text-2xl sm:text-3xl font-black tracking-widest uppercase font-display text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.7)] mt-1">
-          DOM GABRIEL
-        </h1>
-        <p className="text-xs sm:text-sm text-cyan-200/80 font-mono tracking-widest uppercase mt-1">
-          Hamburgueria Artesanal & Delivery Inteligente
-        </p>
-      </div>
-
-      {/* Neon Cyan Spinner Loader & Progress Bar */}
-      <div className="mt-8 flex flex-col items-center gap-3.5 w-full max-w-xs relative z-10">
-        <div className="w-10 h-10 border-4 border-cyan-950 border-t-cyan-400 rounded-full animate-spin shadow-[0_0_15px_rgba(34,211,238,0.5)]" />
-
-        {/* Linear Progress Bar */}
-        <div className="w-full bg-zinc-900 border border-cyan-950/80 h-2 rounded-full overflow-hidden p-0.5">
-          <div
-            className="bg-gradient-to-r from-cyan-500 to-cyan-300 h-full transition-all duration-75 ease-out rounded-full shadow-[0_0_12px_#22d3ee]"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-
-        <span className="text-xs text-cyan-400 font-mono tabular-nums tracking-wider">
-          Iniciando cardápio... {progress}%
-        </span>
-      </div>
-
-      {/* Skip Button */}
-      <button
-        onClick={onFinish}
-        className="mt-6 flex items-center gap-2 text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-full bg-black/80 hover:bg-cyan-950/60 active:bg-cyan-900/60 text-cyan-300 border border-cyan-500/40 hover:border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.25)] transition-all cursor-pointer relative z-10"
-      >
-        <span>Pular introdução</span>
-        <ArrowRight className="w-3.5 h-3.5 text-cyan-400" />
-      </button>
-
-      {/* Footer copyright */}
-      <div className="absolute bottom-4 text-[11px] text-zinc-500 font-mono">
-        Hamburgueria Dom Gabriel
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            finalizarComFade();
+          }}
+          className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full bg-black/60 hover:bg-black/90 text-zinc-200 hover:text-white border border-white/20 hover:border-white/40 backdrop-blur-md shadow-xl transition-all cursor-pointer"
+        >
+          <span>Pular</span>
+          <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
+        </button>
       </div>
     </div>
   );

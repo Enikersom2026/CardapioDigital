@@ -51,20 +51,15 @@
              playsinline: fundamental para rodar dentro do navegador no iPhone
              autoplay: inicia sozinho / muted: obrigatório para o navegador permitir o autoplay
              disabledpictureinpicture: impede o navegador de destacar o vídeo da tela -->
-        <video id="videoAnimacao" playsinline autoplay muted disabledpictureinpicture>
-            <!-- Busca o vídeo adicionado em /video/ ou raiz -->
-            <source src="video/vídeo.mp4" type="video/mp4">
-            <source src="/video/vídeo.mp4" type="video/mp4">
-            <source src="video/video.mp4" type="video/mp4">
+        <video id="videoAnimacao" poster="/poster_abertura.png" playsinline autoplay muted preload="auto" disabledpictureinpicture>
+            <!-- Fontes prioritárias limpas (ASCII) -->
             <source src="/video/video.mp4" type="video/mp4">
-            <source src="video/animacao_abertura.mp4" type="video/mp4">
-            <source src="/video/animacao_abertura.mp4" type="video/mp4">
-            <source src="videos/video.mp4" type="video/mp4">
-            <source src="/videos/video.mp4" type="video/mp4">
-            <source src="video.mp4" type="video/mp4">
-            <source src="/video.mp4" type="video/mp4">
-            <source src="animacao_abertura.mp4" type="video/mp4">
+            <source src="video/video.mp4" type="video/mp4">
             <source src="/animacao_abertura.mp4" type="video/mp4">
+            <source src="animacao_abertura.mp4" type="video/mp4">
+            <source src="/video.mp4" type="video/mp4">
+            <source src="video.mp4" type="video/mp4">
+            <source src="/video/vídeo.mp4" type="video/mp4">
             Seu navegador não suporta vídeos.
         </video>
     </div>
@@ -73,20 +68,34 @@
         const video = document.getElementById('videoAnimacao');
         const container = document.getElementById('splashContainer');
 
-        // Garante a execução forçada caso o navegador bloqueie o autoplay
-        video.play().catch(erro => console.log("Aguardando interação ou carregamento do vídeo..."));
+        // Garante as propriedades exigidas por navegadores modernos para autoplay mudo
+        video.muted = true;
+        video.defaultMuted = true;
 
-        // Conta exatamente 5 segundos (5000 milissegundos), aplica o efeito visual e redireciona
-        setTimeout(() => {
+        function finalizarSplash() {
             container.classList.add('fade-out');
-            
-            // Aguarda 500ms da animação de fade-out terminar para mudar de página
             setTimeout(() => {
-                // Direciona o usuário para a tela de Login/Cadastro que estruturamos
                 window.location.href = "auth.html";
             }, 500);
-            
-        }, 5000);
+        }
+
+        // Tenta iniciar a reprodução automaticamente
+        video.play().catch(erro => {
+            console.log("Aguardando toque na tela para iniciar o vídeo:", erro);
+        });
+
+        // Tocar na tela inicia o vídeo caso o navegador tenha bloqueado
+        document.body.addEventListener('click', () => {
+            if (video.paused) {
+                video.play().catch(console.warn);
+            }
+        });
+
+        // Quando o vídeo de 8 segundos terminar naturalmente, redireciona
+        video.addEventListener('ended', finalizarSplash);
+
+        // Timer de segurança de 8.5 segundos caso o evento 'ended' não dispare
+        setTimeout(finalizarSplash, 8500);
     </script>
 </body>
 </html>

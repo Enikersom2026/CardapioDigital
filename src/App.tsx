@@ -302,9 +302,9 @@ export default function App() {
     setCurrentScreen('splash');
   };
 
-  // Render Splash Screen
+  // Render Splash Screen (Duração de 8s sincronizada com o vídeo de abertura)
   if (currentScreen === 'splash') {
-    return <SplashScreen onFinish={handleSplashFinish} durationSeconds={4} />;
+    return <SplashScreen onFinish={handleSplashFinish} durationSeconds={8} />;
   }
 
   // Render Auth Screen (auth.html equivalent)

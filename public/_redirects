@@ -38,6 +38,11 @@
 /auth.html              /?screen=auth               302
 /auth                   /?screen=auth               302
 
+# Redirecionamento de Vídeos e Assets de Mídia
+/video/*                /video/:splat               200
+/videos/*               /videos/:splat              200
+/*.mp4                  /:splat.mp4                 200
+
 # Redirecionamento de Imagens e Assets Estáticos
 /src/assets/images/*     /assets/images/:splat       200
 /src/assets/*            /assets/:splat              200
